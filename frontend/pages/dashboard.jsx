@@ -86,7 +86,8 @@ export default function Dashboard() {
   const [activoSel, setActivoSel] = useState(0);
   const [historial, setHistorial] = useState({});
   const [activos, setActivos]     = useState([]);
-
+const [isMobile, setIsMobile] = useState(false);
+useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
     if (!usuario) return;
