@@ -250,7 +250,7 @@ useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
                 <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155', fontSize: 11 }}>El gráfico se completará con el tiempo</div>
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
               {[
                 { label: 'RSI (14)', value: rsi.toFixed(1), status: rsi > 70 ? 'Sobrecomprado' : rsi < 30 ? 'Sobrevendido' : 'Neutral', color: rsi > 70 ? '#f87171' : rsi < 30 ? '#34d399' : '#94a3b8' },
                 { label: 'SMA 20', value: `$${sma20.toFixed(0)}`, status: precioActual > sma20 ? 'Por encima' : 'Por debajo', color: precioActual > sma20 ? '#34d399' : '#f87171' },
