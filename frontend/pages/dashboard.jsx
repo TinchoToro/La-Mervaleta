@@ -1,4 +1,4 @@
-// pages/dashboard.jsx – Dashboard con historial de precios real
+// pages/dashboard.jsx – Dashboard con soporte mobile completo
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
@@ -86,8 +86,15 @@ export default function Dashboard() {
   const [activoSel, setActivoSel] = useState(0);
   const [historial, setHistorial] = useState({});
   const [activos, setActivos]     = useState([]);
-const [isMobile, setIsMobile] = useState(false);
-useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
+  const [isMobile, setIsMobile]   = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
     if (!usuario) return;
@@ -132,7 +139,6 @@ useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
   };
   const fund = getFundamental(activoActual);
 
-  // Nav cards — incluye Desafíos
   const navCards = [
     { href: '/mercado',   label: 'Mercado',   color: '#0284c7', icon: '↗', desc: 'Operar'    },
     { href: '/cartera',   label: 'Cartera',   color: '#059669', icon: '◈', desc: 'Posiciones' },
@@ -144,19 +150,48 @@ useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
   return (
     <div style={{ minHeight: '100vh', background: '#0b1120', fontFamily: 'system-ui,-apple-system,sans-serif', color: '#e2e8f0' }}>
 
-      <nav style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* NAV */}
+      <nav style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#059669,#0284c7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="2 18 8 12 13 16 22 6"/><polyline points="17 6 22 6 22 11"/>
             </svg>
           </div>
-          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: -0.5 }}>La Mervaleta</span>
-          <span style={{ fontSize: 11, color: '#475569', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 20 }}>Liga Escolar</span>
+          {!isMobile && <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: -0.5 }}>La Mervaleta</span>}
+          {!isMobile && <span style={{ fontSize: 11, color: '#475569', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 20 }}>Liga Escolar</span>}
         </div>
-        <div style={{ display: 'flex', gap: 16, fontSize: 11 }}>
-          {panelActivos.slice(0,4).map((a,i) => (
-            <span key={a.ticker} style={{ cursor: 'pointer' }} onClick={() => setActivoSel(i)}>
+
+        {/* Precios — solo desktop */}
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 16, fontSize: 11 }}>
+            {panelActivos.slice(0,4).map((a,i) => (
+              <span key={a.ticker} style={{ cursor: 'pointer' }} onClick={() => setActivoSel(i)}>
+                <span style={{ color: '#94a3b8', marginRight: 4 }}>{a.ticker}</span>
+                <span style={{ color: a.variacion_dia >= 0 ? '#34d399' : '#f87171', fontWeight: 700 }}>
+                  {a.variacion_dia >= 0 ? '+' : ''}{a.variacion_dia}%
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Usuario */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {!isMobile && <span style={{ fontSize: 12, color: '#64748b' }}>{usuario?.nombre} {usuario?.apellido}</span>}
+          {(usuario?.rol === 'docente' || usuario?.rol === 'admin') && (
+            <Link href="/docente" style={{ fontSize: isMobile ? 13 : 12, color: '#c084fc', textDecoration: 'none', fontWeight: 600 }}>🎓</Link>
+          )}
+          <button onClick={logout} style={{ fontSize: 11, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', cursor: 'pointer' }}>Salir</button>
+        </div>
+      </nav>
+
+      {/* Precios mobile — fila debajo del nav */}
+      {isMobile && panelActivos.length > 0 && (
+        <div style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '8px 16px', display: 'flex', gap: 14, overflowX: 'auto', fontSize: 11 }}>
+          {panelActivos.map((a,i) => (
+            <span key={a.ticker} style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => setActivoSel(i)}>
               <span style={{ color: '#94a3b8', marginRight: 4 }}>{a.ticker}</span>
               <span style={{ color: a.variacion_dia >= 0 ? '#34d399' : '#f87171', fontWeight: 700 }}>
                 {a.variacion_dia >= 0 ? '+' : ''}{a.variacion_dia}%
@@ -164,38 +199,31 @@ useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
             </span>
           ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 12, color: '#64748b' }}>{usuario?.nombre} {usuario?.apellido}</span>
-          {(usuario?.rol === 'docente' || usuario?.rol === 'admin') && (
-            <Link href="/docente" style={{ fontSize: 12, color: '#c084fc', textDecoration: 'none', fontWeight: 600 }}>🎓 Panel Docente</Link>
-          )}
-          <button onClick={logout} style={{ fontSize: 11, padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', cursor: 'pointer' }}>Salir</button>
-        </div>
-      </nav>
+      )}
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px', display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '16px', display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
 
         {/* Cards superiores */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           {/* Capital */}
-          <div style={{ background: sube ? 'linear-gradient(135deg,#064e3b,#0c4a6e)' : 'linear-gradient(135deg,#4c0519,#1e1b4b)', border: `1px solid ${sube ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`, borderRadius: 16, padding: '20px 24px', gridColumn: 'span 2' }}>
+          <div style={{ background: sube ? 'linear-gradient(135deg,#064e3b,#0c4a6e)' : 'linear-gradient(135deg,#4c0519,#1e1b4b)', border: `1px solid ${sube ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`, borderRadius: 16, padding: isMobile ? '16px' : '20px 24px', gridColumn: 'span 2' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Capital actual</p>
-                <p style={{ fontSize: 34, fontWeight: 900, color: '#fff', letterSpacing: -1, margin: 0 }}>
+                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Capital actual</p>
+                <p style={{ fontSize: isMobile ? 26 : 34, fontWeight: 900, color: '#fff', letterSpacing: -1, margin: 0 }}>
                   ${Number(cartera?.capital_actual || 1000000).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                 </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: sube ? '#34d399' : '#f87171' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <span style={{ fontSize: isMobile ? 14 : 16, fontWeight: 800, color: sube ? '#34d399' : '#f87171' }}>
                     {sube ? '▲' : '▼'} {sube ? '+' : ''}{rendimiento}%
                   </span>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>desde el inicio</span>
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>desde el inicio</span>
                 </div>
               </div>
               {posicion && (
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Posición</p>
-                  <p style={{ fontSize: 40, fontWeight: 900, color: '#fff', margin: 0 }}>#{posicion.posicion}</p>
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Posición</p>
+                  <p style={{ fontSize: isMobile ? 32 : 40, fontWeight: 900, color: '#fff', margin: 0 }}>#{posicion.posicion}</p>
                 </div>
               )}
             </div>
@@ -204,28 +232,30 @@ useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
           {/* Nav cards */}
           {navCards.map(({ href, label, icon, color, desc }) => (
             <Link key={href} href={href} style={{ textDecoration: 'none' }}>
-              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16, cursor: 'pointer', height: '100%' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color, fontWeight: 900, marginBottom: 8 }}>{icon}</div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: '#e2e8f0' }}>{label}</div>
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: isMobile ? '12px' : 16, cursor: 'pointer', height: '100%' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 10, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color, fontWeight: 900, marginBottom: 6 }}>{icon}</div>
+                <div style={{ fontWeight: 700, fontSize: isMobile ? 13 : 14, color: '#e2e8f0' }}>{label}</div>
                 <div style={{ fontSize: 11, color: '#64748b' }}>{desc}</div>
               </div>
             </Link>
           ))}
         </div>
 
-        {/* Análisis técnico + fundamental */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        {/* Análisis técnico + fundamental — columna única en mobile */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
+
+          {/* Análisis Técnico */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div>
                 <p style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: 1, margin: 0 }}>Análisis Técnico · Datos reales</p>
-                <p style={{ fontSize: 16, fontWeight: 800, color: '#e2e8f0', margin: '2px 0 0' }}>{activoActual?.ticker} · {historialActual.length} días</p>
+                <p style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0', margin: '2px 0 0' }}>{activoActual?.ticker} · {historialActual.length} días</p>
               </div>
-              <span style={{ fontSize: 18, fontWeight: 900, color: activoSube ? '#34d399' : '#f87171' }}>
+              <span style={{ fontSize: 17, fontWeight: 900, color: activoSube ? '#34d399' : '#f87171' }}>
                 {activoSube ? '+' : ''}{activoActual?.variacion_dia}%
               </span>
             </div>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
               {panelActivos.map((a, i) => (
                 <button key={a.ticker} onClick={() => setActivoSel(i)}
                   style={{ padding: '3px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700,
@@ -235,22 +265,22 @@ useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
                 </button>
               ))}
             </div>
-            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 10, padding: '10px 8px', marginBottom: 14 }}>
+            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 10, padding: '10px 8px', marginBottom: 12 }}>
               <div style={{ fontSize: 10, color: '#475569', marginBottom: 6, paddingLeft: 4 }}>Velas · {historialActual.length > 0 ? 'Historial real' : 'Sin datos aún'}</div>
-              <CandleChart data={historialActual} width={260} height={110} />
+              <CandleChart data={historialActual} width={isMobile ? window.innerWidth - 80 : 260} height={110} />
             </div>
-            <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+            <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 10, color: '#475569' }}>Tendencia · últimos {historialActual.length} días</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>${Number(activoActual?.precio || 0).toLocaleString('es-AR')}</span>
               </div>
               {historialActual.length >= 2 ? (
-                <Sparkline data={historialActual} color={activoSube ? '#34d399' : '#f87171'} width={240} height={36} />
+                <Sparkline data={historialActual} color={activoSube ? '#34d399' : '#f87171'} width={isMobile ? window.innerWidth - 100 : 240} height={36} />
               ) : (
                 <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155', fontSize: 11 }}>El gráfico se completará con el tiempo</div>
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {[
                 { label: 'RSI (14)', value: rsi.toFixed(1), status: rsi > 70 ? 'Sobrecomprado' : rsi < 30 ? 'Sobrevendido' : 'Neutral', color: rsi > 70 ? '#f87171' : rsi < 30 ? '#34d399' : '#94a3b8' },
                 { label: 'SMA 20', value: `$${sma20.toFixed(0)}`, status: precioActual > sma20 ? 'Por encima' : 'Por debajo', color: precioActual > sma20 ? '#34d399' : '#f87171' },
@@ -266,20 +296,21 @@ useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
             </div>
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 20 }}>
-            <div style={{ marginBottom: 16 }}>
+          {/* Análisis Fundamental */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 18 }}>
+            <div style={{ marginBottom: 14 }}>
               <p style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: 1, margin: 0 }}>Análisis Fundamental</p>
-              <p style={{ fontSize: 16, fontWeight: 800, color: '#e2e8f0', margin: '2px 0 0' }}>{activoActual?.nombre}</p>
+              <p style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0', margin: '2px 0 0' }}>{activoActual?.nombre}</p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
               {activoActual?.tipo === 'accion' || activoActual?.tipo === 'cedear' ? [
                 { label: 'P/E', value: fund.pe, desc: 'Precio/Ganancia', ok: fund.pe < 20 && fund.pe > 0 },
                 { label: 'P/BV', value: fund.pb, desc: 'Precio/Libro', ok: fund.pb < 3 },
                 { label: 'ROE', value: `${fund.roe}%`, desc: 'Retorno capital', ok: fund.roe > 15 },
               ].map(r => (
-                <div key={r.label} style={{ background: r.ok ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.08)', border: `1px solid ${r.ok ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)'}`, borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+                <div key={r.label} style={{ background: r.ok ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.08)', border: `1px solid ${r.ok ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)'}`, borderRadius: 10, padding: '12px 8px', textAlign: 'center' }}>
                   <div style={{ fontSize: 10, color: '#64748b', marginBottom: 4 }}>{r.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: r.ok ? '#34d399' : '#f87171' }}>{r.value}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: r.ok ? '#34d399' : '#f87171' }}>{r.value}</div>
                   <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>{r.desc}</div>
                 </div>
               )) : (
@@ -324,9 +355,9 @@ useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
               <span style={{ fontWeight: 700, fontSize: 14 }}>Mis posiciones</span>
               <Link href="/cartera" style={{ fontSize: 12, color: '#0284c7', textDecoration: 'none', fontWeight: 600 }}>Ver todo →</Link>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px,1fr))' }}>
               {cartera.posiciones.slice(0, 6).map(p => (
-                <div key={p.activo_id} style={{ padding: '14px 20px', borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={p.activo_id} style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: 14, color: '#e2e8f0' }}>{p.ticker}</div>
