@@ -1,4 +1,4 @@
-// pages/cartera.jsx – Cartera con certificado e informe PDF
+// pages/cartera.jsx – Cartera con soporte mobile completo
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
@@ -16,6 +16,14 @@ export default function Cartera() {
   const [loading, setLoading]         = useState(true);
   const [descargando, setDescargando] = useState(false);
   const [descargandoInforme, setDescargandoInforme] = useState(false);
+  const [isMobile, setIsMobile]       = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
@@ -63,45 +71,46 @@ export default function Cartera() {
     <div style={{ minHeight: '100vh', background: '#0b1120', fontFamily: 'system-ui,-apple-system,sans-serif', color: '#e2e8f0' }}>
 
       {/* Nav */}
-      <nav style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <Link href="/dashboard" style={{ color: '#475569', textDecoration: 'none', fontSize: 18 }}>←</Link>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg,#059669,#0284c7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <nav style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Link href="/dashboard" style={{ color: '#475569', textDecoration: 'none', fontSize: 18, flexShrink: 0 }}>←</Link>
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg,#059669,#0284c7)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
           </svg>
         </div>
-        <span style={{ fontWeight: 800, fontSize: 15 }}>Mi Cartera</span>
+        <span style={{ fontWeight: 800, fontSize: 15, flexShrink: 0 }}>Mi Cartera</span>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button onClick={descargarInforme} disabled={descargandoInforme}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)', borderRadius: 10, padding: '7px 14px', fontSize: 12, fontWeight: 700, color: '#60a5fa', cursor: descargandoInforme ? 'not-allowed' : 'pointer', opacity: descargandoInforme ? 0.6 : 1 }}>
-            📄 {descargandoInforme ? 'Generando...' : 'Mi informe'}
+            style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)', borderRadius: 10, padding: isMobile ? '7px 10px' : '7px 14px', fontSize: 12, fontWeight: 700, color: '#60a5fa', cursor: descargandoInforme ? 'not-allowed' : 'pointer', opacity: descargandoInforme ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+            📄 {isMobile ? '' : (descargandoInforme ? 'Generando...' : 'Mi informe')}
+            {isMobile && (descargandoInforme ? '...' : 'Informe')}
           </button>
           <button onClick={descargarCertificado} disabled={descargando}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 10, padding: '7px 14px', fontSize: 12, fontWeight: 700, color: '#fbbf24', cursor: descargando ? 'not-allowed' : 'pointer', opacity: descargando ? 0.6 : 1 }}>
-            🏆 {descargando ? 'Generando...' : 'Mi certificado'}
+            style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 10, padding: isMobile ? '7px 10px' : '7px 14px', fontSize: 12, fontWeight: 700, color: '#fbbf24', cursor: descargando ? 'not-allowed' : 'pointer', opacity: descargando ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+            🏆 {isMobile ? (descargando ? '...' : 'Certif.') : (descargando ? 'Generando...' : 'Mi certificado')}
           </button>
         </div>
       </nav>
 
-      <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Resumen */}
         {cartera && (
-          <div style={{ background: sube ? 'linear-gradient(135deg,#064e3b,#0c4a6e)' : 'linear-gradient(135deg,#4c0519,#1e1b4b)', border: `1px solid ${sube ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'}`, borderRadius: 18, padding: '24px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+          <div style={{ background: sube ? 'linear-gradient(135deg,#064e3b,#0c4a6e)' : 'linear-gradient(135deg,#4c0519,#1e1b4b)', border: `1px solid ${sube ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'}`, borderRadius: 18, padding: '20px 16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
               {[
                 { label: 'Capital actual', valor: `$${Number(cartera.capital_actual).toLocaleString('es-AR', { maximumFractionDigits: 0 })}` },
                 { label: 'Capital inicial', valor: `$${Number(cartera.capital_inicial).toLocaleString('es-AR', { maximumFractionDigits: 0 })}` },
                 { label: 'Rendimiento', valor: `${sube ? '+' : ''}${rendimiento}%`, color: sube ? '#34d399' : '#f87171' },
               ].map(s => (
                 <div key={s.label}>
-                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>{s.label}</p>
-                  <p style={{ fontSize: 26, fontWeight: 900, color: s.color || '#fff', margin: 0 }}>{s.valor}</p>
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>{s.label}</p>
+                  <p style={{ fontSize: isMobile ? 18 : 26, fontWeight: 900, color: s.color || '#fff', margin: 0 }}>{s.valor}</p>
                 </div>
               ))}
             </div>
-            <div style={{ marginTop: 16, height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ marginTop: 14, height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.min(Math.abs(rendimiento) * 3, 100)}%`, background: sube ? '#34d399' : '#f87171', borderRadius: 4 }} />
             </div>
           </div>
@@ -136,7 +145,7 @@ export default function Cartera() {
               <div key={p.activo_id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#059669,#0284c7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#fff' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#059669,#0284c7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
                       {p.ticker?.slice(0,2)}
                     </div>
                     <div>
@@ -153,7 +162,7 @@ export default function Cartera() {
                   {[['Cantidad', p.cantidad], ['Precio compra', `$${Number(p.precio_promedio).toLocaleString('es-AR', { maximumFractionDigits: 2 })}`], ['Precio actual', `$${Number(p.precio_actual).toLocaleString('es-AR', { maximumFractionDigits: 2 })}`]].map(([l, v]) => (
                     <div key={l} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 10px' }}>
                       <div style={{ fontSize: 10, color: '#334155', marginBottom: 2 }}>{l}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8' }}>{v}</div>
+                      <div style={{ fontSize: isMobile ? 11 : 13, fontWeight: 700, color: '#94a3b8' }}>{v}</div>
                     </div>
                   ))}
                 </div>
@@ -168,19 +177,19 @@ export default function Cartera() {
             {historial.length === 0 ? (
               <div style={{ padding: '40px', textAlign: 'center', color: '#475569' }}>No realizaste operaciones todavía.</div>
             ) : historial.map((op, i) => (
-              <div key={op.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: i < historial.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900,
+              <div key={op.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: i < historial.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, flexShrink: 0,
                     background: op.tipo === 'compra' ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
                     color: op.tipo === 'compra' ? '#34d399' : '#f87171' }}>
                     {op.tipo === 'compra' ? '↑' : '↓'}
                   </div>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: '#e2e8f0' }}>{op.tipo === 'compra' ? 'Compra' : 'Venta'} {op.ticker}</div>
-                    <div style={{ fontSize: 12, color: '#475569' }}>{op.cantidad} unidades · ${Number(op.precio).toLocaleString('es-AR', { maximumFractionDigits: 2 })} c/u</div>
+                    <div style={{ fontSize: 11, color: '#475569' }}>{op.cantidad} u. · ${Number(op.precio).toLocaleString('es-AR', { maximumFractionDigits: 2 })} c/u</div>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: op.tipo === 'compra' ? '#f87171' : '#34d399' }}>
                     {op.tipo === 'compra' ? '-' : '+'}${Number(op.total).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                   </div>
@@ -191,9 +200,9 @@ export default function Cartera() {
           </div>
         )}
 
-        {/* Banner PDF */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div style={{ background: 'linear-gradient(135deg,rgba(96,165,250,0.08),rgba(96,165,250,0.03))', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 16, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        {/* Banner PDF — columna única en mobile */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+          <div style={{ background: 'linear-gradient(135deg,rgba(96,165,250,0.08),rgba(96,165,250,0.03))', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 16, padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>📄 Informe de performance</div>
               <div style={{ fontSize: 11, color: '#64748b' }}>Resumen completo para entregar como trabajo práctico.</div>
@@ -203,7 +212,7 @@ export default function Cartera() {
               {descargandoInforme ? '...' : 'Descargar'}
             </button>
           </div>
-          <div style={{ background: 'linear-gradient(135deg,rgba(251,191,36,0.08),rgba(251,191,36,0.03))', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 16, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ background: 'linear-gradient(135deg,rgba(251,191,36,0.08),rgba(251,191,36,0.03))', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 16, padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>🏆 Certificado digital</div>
               <div style={{ fontSize: 11, color: '#64748b' }}>Certificado con QR de verificación al finalizar la liga.</div>
