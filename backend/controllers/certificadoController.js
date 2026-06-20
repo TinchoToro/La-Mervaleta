@@ -12,6 +12,7 @@ const generarCertificado = async (req, res) => {
       `SELECT u.nombre, u.apellido, u.anio_cursada,
               e.nombre AS escuela,
               c.capital_inicial, c.capital_actual,
+              c.temporada_id,
               ROUND(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100, 2) AS rendimiento_pct,
               RANK() OVER (ORDER BY c.capital_actual DESC) AS posicion,
               (SELECT COUNT(*) FROM usuarios WHERE rol = 'alumno' AND activo = TRUE) AS total_alumnos,
@@ -29,7 +30,37 @@ const generarCertificado = async (req, res) => {
     }
 
     const a = alumnoRows[0];
-    const fecha = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    // Obtener datos de la temporada si existe
+    let temporada = null;
+    if (a.temporada_id) {
+      const { rows: tempRows } = await db.query(
+        'SELECT * FROM temporadas WHERE id = $1',
+        [a.temporada_id]
+      );
+      if (tempRows.length > 0) {
+        temporada = tempRows[0];
+      }
+    }
+
+    // Verificar si la temporada terminó — solo se puede descargar cuando terminó
+    if (temporada) {
+      const ahora = new Date();
+      const fechaFin = new Date(temporada.fecha_fin);
+      if (ahora < fechaFin) {
+        const diasRestantes = Math.ceil((fechaFin - ahora) / (1000 * 60 * 60 * 24));
+        return res.status(403).json({
+          error: `El certificado estará disponible cuando termine la liga. Quedan ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''}.`,
+          fecha_fin: temporada.fecha_fin,
+          dias_restantes: diasRestantes
+        });
+      }
+    }
+
+    const fechaEmision = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const fechaInicio = temporada ? new Date(temporada.fecha_inicio).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }) : null;
+    const fechaFin = temporada ? new Date(temporada.fecha_fin).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }) : null;
+
     const codigoVerificacion = `MERV-${usuario_id.slice(0,8).toUpperCase()}`;
     const urlVerificacion = `https://mervaleta.app/verificar/${codigoVerificacion}`;
 
@@ -58,7 +89,7 @@ const generarCertificado = async (req, res) => {
     doc.rect(20, 20, W - 40, H - 40).lineWidth(2).stroke('#059669');
     doc.rect(28, 28, W - 56, H - 56).lineWidth(0.5).stroke('#0284c7');
 
-    // Franja superior degradada simulada
+    // Franja superior
     doc.rect(20, 20, W - 40, 8).fill('#059669');
 
     // Franja inferior
@@ -76,29 +107,39 @@ const generarCertificado = async (req, res) => {
     doc.fontSize(8).fillColor('#334155').font('Helvetica')
        .text('Lic. Martín Acuña · ESETP N° 703 · Puerto Madryn, Chubut', 135, 90);
 
+    // Nombre de la temporada
+    if (temporada) {
+      doc.fontSize(8).fillColor('#0284c7').font('Helvetica-Bold')
+         .text(`📅 ${temporada.nombre}${fechaInicio ? `  ·  ${fechaInicio} → ${fechaFin}` : ''}`, 135, 105);
+    }
+
     // Línea separadora
     doc.moveTo(60, 125).lineTo(W - 60, 125).lineWidth(0.5).stroke('#1e293b');
 
     // Título del certificado
     doc.fontSize(11).fillColor('#475569').font('Helvetica')
-       .text('CERTIFICADO DE PARTICIPACIÓN', 0, 145, { align: 'center', characterSpacing: 4 });
+       .text('CERTIFICADO DE PARTICIPACIÓN', 0, 142, { align: 'center', characterSpacing: 4 });
 
     // Nombre del alumno
-    doc.fontSize(38).fillColor('#f1f5f9').font('Helvetica-Bold')
-       .text(`${a.nombre} ${a.apellido}`, 0, 165, { align: 'center' });
+    doc.fontSize(36).fillColor('#f1f5f9').font('Helvetica-Bold')
+       .text(`${a.nombre} ${a.apellido}`, 0, 160, { align: 'center' });
 
     // Texto de certificación
     doc.fontSize(12).fillColor('#64748b').font('Helvetica')
-       .text('completó exitosamente la Liga Escolar de Inversión', 0, 215, { align: 'center' });
+       .text('completó exitosamente la Liga Escolar de Inversión', 0, 207, { align: 'center' });
 
-    // Escuela y año
-    if (a.escuela) {
+    // Temporada y escuela
+    let subtexto = '';
+    if (temporada) subtexto += temporada.nombre;
+    if (a.escuela) subtexto += (subtexto ? ' · ' : '') + a.escuela;
+    if (a.anio_cursada) subtexto += ' · ' + a.anio_cursada;
+    if (subtexto) {
       doc.fontSize(11).fillColor('#475569').font('Helvetica-Oblique')
-         .text(`${a.escuela}${a.anio_cursada ? ' · ' + a.anio_cursada : ''}`, 0, 235, { align: 'center' });
+         .text(subtexto, 0, 227, { align: 'center' });
     }
 
     // Línea separadora
-    doc.moveTo(W/2 - 150, 258).lineTo(W/2 + 150, 258).lineWidth(0.5).stroke('#1e293b');
+    doc.moveTo(W/2 - 150, 252).lineTo(W/2 + 150, 252).lineWidth(0.5).stroke('#1e293b');
 
     // Métricas - 4 columnas
     const metricas = [
@@ -111,44 +152,45 @@ const generarCertificado = async (req, res) => {
     const metricaW = (W - 120) / 4;
     metricas.forEach((m, i) => {
       const x = 60 + i * metricaW;
-      // Card fondo
-      doc.roundedRect(x + 8, 270, metricaW - 16, 80, 8).fill('#0d1829');
-      doc.roundedRect(x + 8, 270, metricaW - 16, 4, 2).fill(m.color);
-      // Valor
+      doc.roundedRect(x + 8, 265, metricaW - 16, 80, 8).fill('#0d1829');
+      doc.roundedRect(x + 8, 265, metricaW - 16, 4, 2).fill(m.color);
       doc.fontSize(26).fillColor(m.color).font('Helvetica-Bold')
-         .text(m.valor, x + 8, 285, { width: metricaW - 16, align: 'center' });
-      // Label
+         .text(m.valor, x + 8, 280, { width: metricaW - 16, align: 'center' });
       doc.fontSize(8).fillColor('#475569').font('Helvetica')
-         .text(m.label, x + 8, 318, { width: metricaW - 16, align: 'center' });
+         .text(m.label, x + 8, 313, { width: metricaW - 16, align: 'center' });
     });
 
     // Capital final
     doc.fontSize(11).fillColor('#334155').font('Helvetica')
-       .text('Capital final:', W/2 - 100, 368, { width: 200, align: 'center' });
+       .text('Capital final:', W/2 - 100, 360, { width: 200, align: 'center' });
     doc.fontSize(16).fillColor('#f1f5f9').font('Helvetica-Bold')
-       .text(`$${Number(a.capital_actual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, W/2 - 100, 384, { width: 200, align: 'center' });
+       .text(`$${Number(a.capital_actual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, W/2 - 100, 376, { width: 200, align: 'center' });
 
     // Firma docente (izquierda)
-    doc.moveTo(80, 470).lineTo(240, 470).lineWidth(0.5).stroke('#1e293b');
+    doc.moveTo(80, 460).lineTo(240, 460).lineWidth(0.5).stroke('#1e293b');
     doc.fontSize(10).fillColor('#e2e8f0').font('Helvetica-Bold')
-       .text('Lic. Martín Acuña', 80, 478, { width: 160, align: 'center' });
+       .text('Lic. Martín Acuña', 80, 468, { width: 160, align: 'center' });
     doc.fontSize(8).fillColor('#475569').font('Helvetica')
-       .text('Docente responsable', 80, 492, { width: 160, align: 'center' });
+       .text('Docente responsable', 80, 482, { width: 160, align: 'center' });
     doc.fontSize(7).fillColor('#334155').font('Helvetica')
-       .text('ESETP N° 703 · Puerto Madryn', 80, 505, { width: 160, align: 'center' });
+       .text('ESETP N° 703 · Puerto Madryn', 80, 495, { width: 160, align: 'center' });
 
-    // Fecha (centro)
+    // Fecha emisión y temporada (centro)
     doc.fontSize(10).fillColor('#64748b').font('Helvetica')
-       .text(fecha, 0, 478, { align: 'center' });
+       .text(fechaEmision, 0, 468, { align: 'center' });
     doc.fontSize(8).fillColor('#334155').font('Helvetica')
-       .text('Fecha de emisión', 0, 492, { align: 'center' });
+       .text('Fecha de emisión', 0, 482, { align: 'center' });
+    if (temporada && fechaInicio && fechaFin) {
+      doc.fontSize(7).fillColor('#1e293b').font('Helvetica')
+         .text(`Liga: ${fechaInicio} → ${fechaFin}`, 0, 496, { align: 'center' });
+    }
 
     // QR (derecha)
-    doc.image(qrBuffer, W - 200, 445, { width: 90, height: 90 });
+    doc.image(qrBuffer, W - 200, 435, { width: 90, height: 90 });
     doc.fontSize(7).fillColor('#334155').font('Helvetica')
-       .text(codigoVerificacion, W - 200, 540, { width: 90, align: 'center' });
+       .text(codigoVerificacion, W - 200, 530, { width: 90, align: 'center' });
     doc.fontSize(7).fillColor('#1e293b').font('Helvetica')
-       .text('Escanear para verificar', W - 200, 550, { width: 90, align: 'center' });
+       .text('Escanear para verificar', W - 200, 540, { width: 90, align: 'center' });
 
     // Footer
     doc.fontSize(7).fillColor('#1e293b').font('Helvetica')
