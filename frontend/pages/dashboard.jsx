@@ -1,4 +1,4 @@
-// pages/dashboard.jsx – Dashboard con soporte mobile completo
+// pages/dashboard.jsx – Dashboard con soporte mobile completo + info de temporada
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
@@ -80,13 +80,14 @@ const ACTIVOS_PANEL = ['GGAL','YPFD','BMA','PAMP','AAPL'];
 export default function Dashboard() {
   const router = useRouter();
   const { usuario, cargando, logout } = useAuth();
-  const [cartera, setCartera]     = useState(null);
-  const [posicion, setPosicion]   = useState(null);
-  const [loading, setLoading]     = useState(true);
-  const [activoSel, setActivoSel] = useState(0);
-  const [historial, setHistorial] = useState({});
-  const [activos, setActivos]     = useState([]);
-  const [isMobile, setIsMobile]   = useState(false);
+  const [cartera, setCartera]       = useState(null);
+  const [posicion, setPosicion]     = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [activoSel, setActivoSel]   = useState(0);
+  const [historial, setHistorial]   = useState({});
+  const [activos, setActivos]       = useState([]);
+  const [temporada, setTemporada]   = useState(null);
+  const [isMobile, setIsMobile]     = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -98,16 +99,20 @@ export default function Dashboard() {
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
     if (!usuario) return;
+    const token = localStorage.getItem('mervaleta_token');
+    const headers = { Authorization: `Bearer ${token}` };
     Promise.all([
       carteraService.miCartera(),
       rankingService.miPosicion().catch(() => null),
       carteraService.listarActivos(),
-      fetch(`${API}/historial`, { headers: { Authorization: `Bearer ${localStorage.getItem('mervaleta_token')}` } }).then(r => r.json()),
-    ]).then(([c, p, a, h]) => {
+      fetch(`${API}/historial`, { headers }).then(r => r.json()).catch(() => ({})),
+      fetch(`${API}/temporadas/activa`, { headers }).then(r => r.json()).catch(() => null),
+    ]).then(([c, p, a, h, t]) => {
       setCartera(c);
       setPosicion(p);
       setActivos(Array.isArray(a) ? a : []);
       setHistorial(h && typeof h === 'object' ? h : {});
+      setTemporada(t || null);
     }).finally(() => setLoading(false));
   }, [usuario, cargando]);
 
@@ -139,6 +144,19 @@ export default function Dashboard() {
   };
   const fund = getFundamental(activoActual);
 
+  // Calcular días restantes de temporada
+  let diasRestantes = null;
+  let pctTemporada = 0;
+  if (temporada) {
+    const ahora = new Date();
+    const inicio = new Date(temporada.fecha_inicio);
+    const fin = new Date(temporada.fecha_fin);
+    diasRestantes = Math.max(0, Math.ceil((fin - ahora) / (1000 * 60 * 60 * 24)));
+    const totalDias = Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24));
+    const diasTranscurridos = Math.ceil((ahora - inicio) / (1000 * 60 * 60 * 24));
+    pctTemporada = Math.min(100, Math.max(0, Math.round((diasTranscurridos / totalDias) * 100)));
+  }
+
   const navCards = [
     { href: '/mercado',   label: 'Mercado',   color: '#0284c7', icon: '↗', desc: 'Operar'    },
     { href: '/cartera',   label: 'Cartera',   color: '#059669', icon: '◈', desc: 'Posiciones' },
@@ -152,7 +170,6 @@ export default function Dashboard() {
 
       {/* NAV */}
       <nav style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#059669,#0284c7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -163,7 +180,6 @@ export default function Dashboard() {
           {!isMobile && <span style={{ fontSize: 11, color: '#475569', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 20 }}>Liga Escolar</span>}
         </div>
 
-        {/* Precios — solo desktop */}
         {!isMobile && (
           <div style={{ display: 'flex', gap: 16, fontSize: 11 }}>
             {panelActivos.slice(0,4).map((a,i) => (
@@ -177,7 +193,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Usuario */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {!isMobile && <span style={{ fontSize: 12, color: '#64748b' }}>{usuario?.nombre} {usuario?.apellido}</span>}
           {(usuario?.rol === 'docente' || usuario?.rol === 'admin') && (
@@ -187,7 +202,7 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* Precios mobile — fila debajo del nav */}
+      {/* Precios mobile */}
       {isMobile && panelActivos.length > 0 && (
         <div style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '8px 16px', display: 'flex', gap: 14, overflowX: 'auto', fontSize: 11 }}>
           {panelActivos.map((a,i) => (
@@ -202,6 +217,50 @@ export default function Dashboard() {
       )}
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '16px', display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+
+        {/* BANNER DE TEMPORADA */}
+        {temporada ? (
+          <div style={{ background: 'rgba(2,132,199,0.08)', border: '1px solid rgba(2,132,199,0.25)', borderRadius: 14, padding: '14px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18 }}>🏆</span>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: '#f1f5f9' }}>{temporada.nombre}</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>
+                    {new Date(temporada.fecha_inicio).toLocaleDateString('es-AR')} → {new Date(temporada.fecha_fin).toLocaleDateString('es-AR')}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                {posicion && (
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: '#60a5fa' }}>#{posicion.posicion}</div>
+                    <div style={{ fontSize: 10, color: '#475569' }}>Tu posición</div>
+                  </div>
+                )}
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: diasRestantes === 0 ? '#34d399' : '#fbbf24' }}>
+                    {diasRestantes === 0 ? '✓ Fin' : `${diasRestantes}d`}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#475569' }}>{diasRestantes === 0 ? 'Finalizada' : 'Restantes'}</div>
+                </div>
+              </div>
+            </div>
+            {/* Barra de progreso */}
+            <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pctTemporada}%`, background: 'linear-gradient(90deg,#0284c7,#059669)', borderRadius: 4, transition: 'width 1s ease' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: '#334155' }}>{pctTemporada}% completado</span>
+              <Link href="/ranking" style={{ fontSize: 11, color: '#0284c7', textDecoration: 'none', fontWeight: 600 }}>Ver ranking →</Link>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16 }}>📅</span>
+            <span style={{ fontSize: 13, color: '#475569' }}>No hay una liga activa en este momento. Tu docente la activará pronto.</span>
+          </div>
+        )}
 
         {/* Cards superiores */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
@@ -222,7 +281,7 @@ export default function Dashboard() {
               </div>
               {posicion && (
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Posición</p>
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Posición en liga</p>
                   <p style={{ fontSize: isMobile ? 32 : 40, fontWeight: 900, color: '#fff', margin: 0 }}>#{posicion.posicion}</p>
                 </div>
               )}
@@ -241,10 +300,9 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Análisis técnico + fundamental — columna única en mobile */}
+        {/* Análisis técnico + fundamental */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
 
-          {/* Análisis Técnico */}
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div>
@@ -296,7 +354,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Análisis Fundamental */}
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 18 }}>
             <div style={{ marginBottom: 14 }}>
               <p style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: 1, margin: 0 }}>Análisis Fundamental</p>
