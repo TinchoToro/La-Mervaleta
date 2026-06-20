@@ -5,9 +5,8 @@ const db     = require('../config/db');
 
 // POST /api/auth/register
 const register = async (req, res) => {
- 
   const { nombre, apellido, email, password, escuela_id, anio_cursada } = req.body;
-const rol = 'alumno';
+  const rol = 'alumno';
   if (!nombre || !apellido || !email || !password || !rol) {
     return res.status(400).json({ error: 'Todos los campos son obligatorios' });
   }
@@ -16,7 +15,6 @@ const rol = 'alumno';
   }
 
   try {
-    // Verificar email único
     const existe = await db.query('SELECT id FROM usuarios WHERE email = $1', [email]);
     if (existe.rows.length > 0) {
       return res.status(409).json({ error: 'El email ya está registrado' });
@@ -24,18 +22,15 @@ const rol = 'alumno';
 
     const hash = await bcrypt.hash(password, 10);
     const { rows } = await db.query(
-    `INSERT INTO usuarios (nombre, apellido, email, password_hash, rol, escuela_id, anio_cursada)\n VALUES ($1, $2, $3, $4, $5, $6, $7)\n RETURNING id, nombre, apellido, email, rol, escuela_id`,
+      `INSERT INTO usuarios (nombre, apellido, email, password_hash, rol, escuela_id, anio_cursada)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, nombre, apellido, email, rol, escuela_id, perfil_completado, perfil_riesgo`,
       [nombre, apellido, email, hash, rol, escuela_id || null, anio_cursada || null]
-      
     );
     const usuario = rows[0];
 
-    // Si es alumno, crear cartera automáticamente
     if (rol === 'alumno') {
-      await db.query(
-        'INSERT INTO carteras (usuario_id) VALUES ($1)',
-        [usuario.id]
-      );
+      await db.query('INSERT INTO carteras (usuario_id) VALUES ($1)', [usuario.id]);
     }
 
     const token = generarToken(usuario);
@@ -72,7 +67,6 @@ const login = async (req, res) => {
     await db.query('UPDATE usuarios SET ultima_actividad = NOW() WHERE id = $1', [usuario.id]);
     const token = generarToken(usuario);
     res.json({ usuario, token });
-    
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al iniciar sesión' });
@@ -83,7 +77,7 @@ const login = async (req, res) => {
 const me = async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, nombre, apellido, email, rol, escuela_id, created_at
+      `SELECT id, nombre, apellido, email, rol, escuela_id, perfil_completado, perfil_riesgo, created_at
        FROM usuarios WHERE id = $1`,
       [req.usuario.id]
     );
@@ -93,13 +87,21 @@ const me = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener perfil' });
   }
 };
+
 const generarToken = (usuario) =>
   jwt.sign(
-    { id: usuario.id, email: usuario.email, rol: usuario.rol, escuela_id: usuario.escuela_id, perfil_completado: usuario.perfil_completado },
-
+    {
+      id: usuario.id,
+      email: usuario.email,
+      rol: usuario.rol,
+      escuela_id: usuario.escuela_id,
+      perfil_completado: usuario.perfil_completado || false,
+      perfil_riesgo: usuario.perfil_riesgo || null,
+    },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
+
 const guardarPerfilRiesgo = async (req, res) => {
   try {
     const { perfil_riesgo } = req.body;
@@ -110,7 +112,16 @@ const guardarPerfilRiesgo = async (req, res) => {
       'UPDATE usuarios SET perfil_riesgo = $1, perfil_completado = TRUE WHERE id = $2',
       [perfil_riesgo, req.usuario.id]
     );
-    res.json({ mensaje: 'Perfil guardado', perfil_riesgo });
+
+    // Devolver nuevo token con perfil_completado = true
+    const { rows } = await db.query(
+      'SELECT id, email, rol, escuela_id, perfil_completado, perfil_riesgo FROM usuarios WHERE id = $1',
+      [req.usuario.id]
+    );
+    const usuario = rows[0];
+    const token = generarToken(usuario);
+
+    res.json({ mensaje: 'Perfil guardado', perfil_riesgo, token });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al guardar perfil' });
