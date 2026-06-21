@@ -1,7 +1,6 @@
 // controllers/desafiosController.js – Motor de validación automática
 const db = require('../config/db');
 
-// Motor de validación por tipo de regla
 async function validarDesafio(usuario_id, regla) {
   if (!regla || !regla.tipo) return { completado: false, progreso: 0, objetivo: 1 };
 
@@ -11,34 +10,11 @@ async function validarDesafio(usuario_id, regla) {
       const { rows } = await db.query(
         `SELECT COUNT(*) AS cnt FROM operaciones o
          JOIN activos a ON a.id = o.activo_id
-         WHERE o.usuario_id = $1 AND o.tipo = 'compra'
-         ${regla.panel_lider ? "AND a.ticker = ANY(ARRAY['GGAL','YPFD','BMA','PAMP','BBAR','TECO2','TGSU2','TXAR','CEPU','BYMA'])" : ''}`,
+         WHERE o.usuario_id = $1 AND o.tipo = 'compra'`,
         [usuario_id]
       );
       const cnt = parseInt(rows[0].cnt);
       return { completado: cnt >= 1, progreso: Math.min(cnt, 1), objetivo: 1 };
-    }
-
-    case 'comprar_tipo': {
-      const { rows } = await db.query(
-        `SELECT COUNT(DISTINCT a.id) AS cnt FROM operaciones o
-         JOIN activos a ON a.id = o.activo_id
-         WHERE o.usuario_id = $1 AND o.tipo = 'compra' AND a.tipo = $2`,
-        [usuario_id, regla.tipo_activo]
-      );
-      const cnt = parseInt(rows[0].cnt);
-      return { completado: cnt >= regla.cantidad, progreso: cnt, objetivo: regla.cantidad };
-    }
-
-    case 'operar_distintos': {
-      const { rows } = await db.query(
-        `SELECT COUNT(DISTINCT a.id) AS cnt FROM operaciones o
-         JOIN activos a ON a.id = o.activo_id
-         WHERE o.usuario_id = $1 AND a.tipo = $2`,
-        [usuario_id, regla.tipo_activo]
-      );
-      const cnt = parseInt(rows[0].cnt);
-      return { completado: cnt >= regla.cantidad, progreso: cnt, objetivo: regla.cantidad };
     }
 
     case 'total_operaciones': {
@@ -62,6 +38,7 @@ async function validarDesafio(usuario_id, regla) {
       return { completado: cnt >= regla.cantidad, progreso: cnt, objetivo: regla.cantidad };
     }
 
+    case 'cedear_en_cartera':
     case 'cedears_en_cartera': {
       const { rows } = await db.query(
         `SELECT COUNT(DISTINCT a.id) AS cnt FROM posiciones p
@@ -103,50 +80,6 @@ async function validarDesafio(usuario_id, regla) {
       return { completado: pct >= regla.pct_minimo, progreso: pct, objetivo: regla.pct_minimo };
     }
 
-    case 'sectores_especificos': {
-      const sectoresReq = regla.sectores || [];
-      const { rows } = await db.query(
-        `SELECT DISTINCT a.sector FROM posiciones p
-         JOIN carteras c ON c.id = p.cartera_id
-         JOIN activos a ON a.id = p.activo_id
-         WHERE c.usuario_id = $1 AND p.cantidad > 0`,
-        [usuario_id]
-      );
-      const sectoresTiene = rows.map(r => r.sector?.toLowerCase());
-      const cumplidos = sectoresReq.filter(s => sectoresTiene.some(t => t?.includes(s))).length;
-      return { completado: cumplidos >= sectoresReq.length, progreso: cumplidos, objetivo: sectoresReq.length };
-    }
-
-    case 'concentracion_maxima': {
-      const { rows } = await db.query(
-        `SELECT 
-           MAX(p.cantidad * a.precio) AS max_pos,
-           SUM(p.cantidad * a.precio) AS total
-         FROM posiciones p
-         JOIN carteras c ON c.id = p.cartera_id
-         JOIN activos a ON a.id = p.activo_id
-         WHERE c.usuario_id = $1 AND p.cantidad > 0`,
-        [usuario_id]
-      );
-      const maxPos = parseFloat(rows[0].max_pos || 0);
-      const total = parseFloat(rows[0].total || 1);
-      const pctMax = total > 0 ? Math.round((maxPos / total) * 100) : 0;
-      const cumple = pctMax <= regla.pct_maximo;
-      return { completado: cumple, progreso: cumple ? regla.pct_maximo : pctMax, objetivo: regla.pct_maximo };
-    }
-
-    case 'renta_fija_cantidad': {
-      const { rows } = await db.query(
-        `SELECT COUNT(DISTINCT a.id) AS cnt FROM posiciones p
-         JOIN carteras c ON c.id = p.cartera_id
-         JOIN activos a ON a.id = p.activo_id
-         WHERE c.usuario_id = $1 AND p.cantidad > 0 AND a.tipo IN ('bono','letra')`,
-        [usuario_id]
-      );
-      const cnt = parseInt(rows[0].cnt);
-      return { completado: cnt >= regla.cantidad, progreso: cnt, objetivo: regla.cantidad };
-    }
-
     case 'conceptos_leidos': {
       const { rows } = await db.query(
         'SELECT COUNT(*) AS cnt FROM conceptos_vistos WHERE usuario_id = $1',
@@ -166,8 +99,7 @@ async function validarDesafio(usuario_id, regla) {
 
     case 'superar_promedio_escuela': {
       const { rows } = await db.query(
-        `SELECT 
-           c.capital_actual, c.capital_inicial,
+        `SELECT c.capital_actual,
            (SELECT AVG(c2.capital_actual) FROM carteras c2 
             JOIN usuarios u2 ON u2.id = c2.usuario_id 
             WHERE u2.escuela_id = u.escuela_id AND u2.rol = 'alumno') AS promedio_escuela
@@ -196,32 +128,38 @@ async function validarDesafio(usuario_id, regla) {
   }
 }
 
-// GET /api/desafios – desafíos activos con progreso del alumno
+// GET /api/desafios
 const listarDesafios = async (req, res) => {
   try {
     const { rows: desafios } = await db.query(
-      `SELECT d.*, bd.regla_json FROM desafios d
-       LEFT JOIN banco_desafios bd ON bd.titulo = d.nombre
-       WHERE d.activo = TRUE AND d.fecha_fin >= NOW()
-       ORDER BY d.fecha_fin ASC`
+      `SELECT * FROM desafios
+       WHERE activo = TRUE AND fecha_fin >= CURRENT_DATE
+       ORDER BY fecha_fin ASC`
     );
 
     const resultado = await Promise.all(desafios.map(async d => {
-      // Buscar progreso existente
       const { rows: prog } = await db.query(
         'SELECT * FROM desafios_progreso WHERE desafio_id = $1 AND usuario_id = $2',
         [d.id, req.usuario.id]
       );
 
-      // Si ya está completado, no re-validar
       if (prog[0]?.completado) {
-        return { ...d, completado: true, progreso_actual: prog[0].progreso_actual, progreso_objetivo: prog[0].progreso_objetivo, fecha_completado: prog[0].fecha_completado };
+        return {
+          ...d,
+          completado: true,
+          progreso_actual: prog[0].progreso_actual,
+          progreso_objetivo: prog[0].progreso_objetivo,
+          fecha_completado: prog[0].fecha_completado
+        };
       }
 
-      // Validar en tiempo real
-      const validacion = await validarDesafio(req.usuario.id, d.regla_json);
+      let regla = null;
+      try {
+        regla = typeof d.regla_json === 'string' ? JSON.parse(d.regla_json) : d.regla_json;
+      } catch(e) { regla = null; }
 
-      // Guardar/actualizar progreso
+      const validacion = await validarDesafio(req.usuario.id, regla);
+
       await db.query(
         `INSERT INTO desafios_progreso (desafio_id, usuario_id, completado, progreso_actual, progreso_objetivo, fecha_completado)
          VALUES ($1, $2, $3, $4, $5, $6)
@@ -231,7 +169,12 @@ const listarDesafios = async (req, res) => {
          validacion.completado ? new Date() : null]
       );
 
-      return { ...d, completado: validacion.completado, progreso_actual: validacion.progreso, progreso_objetivo: validacion.objetivo };
+      return {
+        ...d,
+        completado: validacion.completado,
+        progreso_actual: validacion.progreso,
+        progreso_objetivo: validacion.objetivo
+      };
     }));
 
     res.json(resultado);
@@ -241,11 +184,11 @@ const listarDesafios = async (req, res) => {
   }
 };
 
-// GET /api/desafios/actual – desafío activo actual
+// GET /api/desafios/actual
 const desafioActual = async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT * FROM desafios WHERE activo = TRUE AND fecha_fin >= NOW() ORDER BY fecha_fin ASC LIMIT 1`
+      `SELECT * FROM desafios WHERE activo = TRUE AND fecha_fin >= CURRENT_DATE ORDER BY fecha_fin ASC LIMIT 1`
     );
     res.json(rows[0] || null);
   } catch (err) {
@@ -253,14 +196,14 @@ const desafioActual = async (req, res) => {
   }
 };
 
-// POST /api/desafios – crear desafío
+// POST /api/desafios
 const crearDesafio = async (req, res) => {
   try {
-    const { nombre, descripcion, puntos_bonus, fecha_inicio, fecha_fin } = req.body;
+    const { nombre, descripcion, puntos_bonus, fecha_inicio, fecha_fin, regla_json } = req.body;
     const { rows } = await db.query(
-      `INSERT INTO desafios (nombre, descripcion, puntos_bonus, fecha_inicio, fecha_fin, activo)
-       VALUES ($1, $2, $3, $4, $5, TRUE) RETURNING *`,
-      [nombre, descripcion, puntos_bonus || 300, fecha_inicio, fecha_fin]
+      `INSERT INTO desafios (nombre, descripcion, puntos_bonus, fecha_inicio, fecha_fin, activo, regla_json)
+       VALUES ($1, $2, $3, $4, $5, TRUE, $6) RETURNING *`,
+      [nombre, descripcion, puntos_bonus || 300, fecha_inicio, fecha_fin, regla_json || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
