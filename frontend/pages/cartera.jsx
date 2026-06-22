@@ -37,14 +37,23 @@ export default function Cartera() {
     try {
       const token = localStorage.getItem('mervaleta_token');
       const res = await fetch(`${API}/certificado/descargar`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error('Error');
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Error al descargar el certificado.');
+        return;
+      }
+
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `certificado_mervaleta_${usuario.nombre}_${usuario.apellido}.pdf`; a.click();
       URL.revokeObjectURL(url);
-    } catch { alert('Error al descargar el certificado.'); }
-    finally { setDescargando(false); }
+    } catch {
+      alert('Error al descargar el certificado.');
+    } finally {
+      setDescargando(false);
+    }
   };
 
   const descargarInforme = async () => {
@@ -200,7 +209,7 @@ export default function Cartera() {
           </div>
         )}
 
-        {/* Banner PDF — columna única en mobile */}
+        {/* Banner PDF */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
           <div style={{ background: 'linear-gradient(135deg,rgba(96,165,250,0.08),rgba(96,165,250,0.03))', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 16, padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
