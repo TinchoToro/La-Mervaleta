@@ -5,8 +5,7 @@ const db = require('../config/db');
 // Lista todos los alumnos de la escuela del docente con métricas pedagógicas
 const listarAlumnos = async (req, res) => {
   try {
-    const escuela_id = req.usuario.escuela_id;
-    if (!escuela_id) return res.status(400).json({ error: 'El docente no tiene escuela asignada' });
+    const escuela_id = req.usuario.escuela_id || null;
 
     const { rows } = await db.query(
       `SELECT
@@ -41,7 +40,7 @@ const listarAlumnos = async (req, res) => {
          ), 0) AS concentracion_max_pct
        FROM usuarios u
        JOIN carteras c ON c.usuario_id = u.id
-       WHERE u.escuela_id = $1 AND u.rol = 'alumno' AND u.activo = TRUE
+       WHERE ($1::uuid IS NULL OR u.escuela_id = $1) AND u.rol = 'alumno' AND u.activo = TRUE
        ORDER BY c.capital_actual DESC`,
       [escuela_id]
     );
@@ -87,15 +86,15 @@ const listarAlumnos = async (req, res) => {
 const detalleAlumno = async (req, res) => {
   try {
     const { id } = req.params;
-    const escuela_id = req.usuario.escuela_id;
+    const escuela_id = req.usuario.escuela_id || null;
 
-    // Verificar que el alumno pertenece a la escuela del docente
+    // Verificar que el alumno pertenece a la escuela del docente (o ver todos si no tiene escuela)
     const { rows: alumnoRows } = await db.query(
       `SELECT u.id, u.nombre, u.apellido, u.email, u.anio_cursada, u.ultima_actividad,
               c.capital_inicial, c.capital_actual,
               ROUND(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100, 2) AS rendimiento_pct
        FROM usuarios u JOIN carteras c ON c.usuario_id = u.id
-       WHERE u.id = $1 AND u.escuela_id = $2 AND u.rol = 'alumno'`,
+       WHERE u.id = $1 AND ($2::uuid IS NULL OR u.escuela_id = $2) AND u.rol = 'alumno'`,
       [id, escuela_id]
     );
     if (alumnoRows.length === 0) return res.status(404).json({ error: 'Alumno no encontrado' });
@@ -146,8 +145,7 @@ const detalleAlumno = async (req, res) => {
 // Métricas generales de la escuela para el panel principal
 const resumenEscuela = async (req, res) => {
   try {
-    const escuela_id = req.usuario.escuela_id;
-    if (!escuela_id) return res.status(400).json({ error: 'Sin escuela asignada' });
+    const escuela_id = req.usuario.escuela_id || null;
 
     const { rows } = await db.query(
       `SELECT
@@ -157,10 +155,10 @@ const resumenEscuela = async (req, res) => {
          COUNT(CASE WHEN ((c.capital_actual - c.capital_inicial) / c.capital_inicial) > 0 THEN 1 END) AS alumnos_positivos,
          COUNT(CASE WHEN ((c.capital_actual - c.capital_inicial) / c.capital_inicial) < -0.15 THEN 1 END) AS alumnos_perdida_alta,
          (SELECT COUNT(*) FROM operaciones o JOIN usuarios u2 ON u2.id = o.usuario_id
-          WHERE u2.escuela_id = $1 AND o.fecha > NOW() - INTERVAL '7 days') AS operaciones_semana
+          WHERE ($1::uuid IS NULL OR u2.escuela_id = $1) AND o.fecha > NOW() - INTERVAL '7 days') AS operaciones_semana
        FROM usuarios u
        JOIN carteras c ON c.usuario_id = u.id
-       WHERE u.escuela_id = $1 AND u.rol = 'alumno' AND u.activo = TRUE`,
+       WHERE ($1::uuid IS NULL OR u.escuela_id = $1) AND u.rol = 'alumno' AND u.activo = TRUE`,
       [escuela_id]
     );
 
@@ -169,18 +167,18 @@ const resumenEscuela = async (req, res) => {
       `SELECT u.anio_cursada, COUNT(*) AS cantidad,
               ROUND(AVG(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100), 2) AS rendimiento_promedio
        FROM usuarios u JOIN carteras c ON c.usuario_id = u.id
-       WHERE u.escuela_id = $1 AND u.rol = 'alumno' AND u.activo = TRUE
+       WHERE ($1::uuid IS NULL OR u.escuela_id = $1) AND u.rol = 'alumno' AND u.activo = TRUE
        GROUP BY u.anio_cursada ORDER BY u.anio_cursada`,
       [escuela_id]
     );
 
-    // Top 3 activos más operados en la escuela
+    // Top 5 activos más operados en la escuela
     const { rows: topActivos } = await db.query(
       `SELECT a.ticker, a.nombre, COUNT(*) AS operaciones, SUM(o.total) AS volumen
        FROM operaciones o
        JOIN usuarios u ON u.id = o.usuario_id
        JOIN activos a ON a.id = o.activo_id
-       WHERE u.escuela_id = $1
+       WHERE ($1::uuid IS NULL OR u.escuela_id = $1)
        GROUP BY a.ticker, a.nombre ORDER BY operaciones DESC LIMIT 5`,
       [escuela_id]
     );
