@@ -37,24 +37,19 @@ export default function Docente() {
   const [loading, setLoading]       = useState(true);
   const [msg, setMsg]               = useState(null);
 
-  // Liga
   const [resumen, setResumen]       = useState(null);
   const [alumnos, setAlumnos]       = useState([]);
-  const [alumnoDetalle, setAlumnoDetalle] = useState(null);
 
-  // Temporadas
   const [temporadas, setTemporadas] = useState([]);
   const [formTemp, setFormTemp]     = useState({ nombre: '', descripcion: '', fecha_inicio: '', fecha_fin: '', capital_inicial: '1000000' });
   const [editandoTemp, setEditandoTemp] = useState(null);
   const [modalTemp, setModalTemp]   = useState(false);
 
-  // Desafíos
   const [desafios, setDesafios]     = useState([]);
   const [filtroAnio, setFiltroAnio] = useState('todos');
   const [modalAsignar, setModalAsignar] = useState(null);
   const [fechaAsignar, setFechaAsignar] = useState({ inicio: '', fin: '' });
 
-  // Academia
   const [conceptos, setConceptos]   = useState([]);
   const [glosario, setGlosario]     = useState([]);
   const [busGlosario, setBusGlosario] = useState('');
@@ -93,7 +88,6 @@ export default function Docente() {
 
   const showMsg = (tipo, texto) => { setMsg({ tipo, texto }); setTimeout(() => setMsg(null), 3000); };
 
-  // Temporadas
   const guardarTemp = async () => {
     if (!formTemp.nombre || !formTemp.fecha_inicio || !formTemp.fecha_fin) { showMsg('error', 'Completá nombre y fechas'); return; }
     const ep = editandoTemp ? `/temporadas/${editandoTemp}` : '/temporadas';
@@ -113,7 +107,6 @@ export default function Docente() {
     setTemporadas(Array.isArray(t) ? t : []);
   };
 
-  // Desafíos
   const asignarDesafio = async () => {
     if (!fechaAsignar.inicio || !fechaAsignar.fin) { showMsg('error', 'Definí fechas'); return; }
     const data = await apiFetch(`/banco-desafios/${modalAsignar.id}/asignar`, {
@@ -124,7 +117,6 @@ export default function Docente() {
     setModalAsignar(null);
   };
 
-  // Academia
   const crearConcepto = async () => {
     if (!formConcepto.titulo || !formConcepto.contenido) { showMsg('error', 'Completá título y contenido'); return; }
     const data = await apiFetch('/conceptos', { method: 'POST', body: JSON.stringify(formConcepto) });
@@ -145,7 +137,6 @@ export default function Docente() {
     setGlosario(Array.isArray(g) ? g : []);
   };
 
-  // Resetear cartera alumno
   const resetearCartera = async (id, nombre) => {
     if (!confirm(`¿Resetear la cartera de ${nombre}?`)) return;
     const data = await apiFetch(`/admin/usuarios/${id}/resetear-cartera`, { method: 'POST' });
@@ -193,7 +184,6 @@ export default function Docente() {
 
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 16px' }}>
 
-        {/* Mensaje */}
         {msg && (
           <div style={{ borderRadius: 10, padding: '10px 16px', fontSize: 13, fontWeight: 600, marginBottom: 16,
             background: msg.tipo === 'ok' ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
@@ -206,7 +196,6 @@ export default function Docente() {
         {/* ── MI LIGA ── */}
         {tab === 'liga' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
               {[
                 { label: 'Alumnos inscriptos', valor: resumen?.total_alumnos || 0, color: '#60a5fa' },
@@ -223,7 +212,6 @@ export default function Docente() {
               ))}
             </div>
 
-            {/* Ranking rápido */}
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, overflow: 'hidden' }}>
               <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 700 }}>🏆 Ranking de tu liga</span>
@@ -250,7 +238,7 @@ export default function Docente() {
               })}
             </div>
 
-            {/* Alertas pedagógicas */}
+            {/* Alertas pedagógicas — FIX: al.msg en lugar de al */}
             {alumnos.filter(a => a.alertas?.length > 0).length > 0 && (
               <div style={{ background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 16, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(248,113,113,0.1)' }}>
@@ -260,7 +248,7 @@ export default function Docente() {
                   <div key={a.id} style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{a.nombre} {a.apellido}</div>
                     {a.alertas.map((al, i) => (
-                      <div key={i} style={{ fontSize: 12, color: '#f87171', marginBottom: 2 }}>• {al}</div>
+                      <div key={i} style={{ fontSize: 12, color: '#f87171', marginBottom: 2 }}>• {al.msg}</div>
                     ))}
                   </div>
                 ))}
@@ -301,9 +289,10 @@ export default function Docente() {
                       Resetear cartera
                     </button>
                   </div>
+                  {/* FIX: al.msg en lugar de al */}
                   {a.alertas?.length > 0 && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                      {a.alertas.map((al, i) => <div key={i} style={{ fontSize: 11, color: '#f87171' }}>⚠️ {al}</div>)}
+                      {a.alertas.map((al, i) => <div key={i} style={{ fontSize: 11, color: '#f87171' }}>⚠️ {al.msg}</div>)}
                     </div>
                   )}
                 </div>
@@ -407,8 +396,6 @@ export default function Docente() {
         {/* ── ACADEMIA ── */}
         {tab === 'academia' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            {/* Conceptos */}
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, overflow: 'hidden' }}>
               <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 700 }}>📚 Conceptos educativos ({conceptos.length})</span>
@@ -429,7 +416,6 @@ export default function Docente() {
               </div>
             </div>
 
-            {/* Glosario */}
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, overflow: 'hidden' }}>
               <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 700 }}>📖 Glosario financiero ({glosario.length})</span>
@@ -455,7 +441,6 @@ export default function Docente() {
               </div>
             </div>
 
-            {/* Links rápidos */}
             <div style={{ display: 'flex', gap: 10 }}>
               <Link href="/conceptos" style={{ flex: 1, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 12, padding: '14px', textAlign: 'center', textDecoration: 'none', color: '#a78bfa', fontWeight: 700, fontSize: 13 }}>
                 Ver academia completa →
