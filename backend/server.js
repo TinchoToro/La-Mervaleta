@@ -44,7 +44,7 @@ app.use('/api/glosario', require('./routes/glosario'));
 app.use('/api/historial', require('./routes/historial'));
 app.use('/api/informe', require('./routes/informe'));
 app.use('/api/trazabilidad', require('./routes/trazabilidad'));
-
+app.use('/api/precios', require('./routes/precios'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'La Mervaleta' }));
