@@ -155,7 +155,6 @@ const eliminarAlumno = async (req, res) => {
     const { id } = req.params;
     const escuela_id = req.usuario.escuela_id;
 
-    // Verificar que el alumno pertenece a la escuela del docente
     const { rows } = await client.query(
       `SELECT u.id FROM usuarios u
        WHERE u.id = $1 AND u.escuela_id = $2 AND u.rol = 'alumno'`,
@@ -165,10 +164,10 @@ const eliminarAlumno = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Borrar en orden para respetar foreign keys
     await client.query(`DELETE FROM conceptos_vistos WHERE usuario_id = $1`, [id]);
-    await client.query(`DELETE FROM operaciones WHERE usuario_id = $1`, [id]);
+    await client.query(`DELETE FROM desafios_progreso WHERE usuario_id = $1`, [id]);
     await client.query(`DELETE FROM desafios_completados WHERE usuario_id = $1`, [id]);
+    await client.query(`DELETE FROM operaciones WHERE usuario_id = $1`, [id]);
     await client.query(`DELETE FROM posiciones WHERE cartera_id IN (SELECT id FROM carteras WHERE usuario_id = $1)`, [id]);
     await client.query(`DELETE FROM historial_capital WHERE cartera_id IN (SELECT id FROM carteras WHERE usuario_id = $1)`, [id]);
     await client.query(`DELETE FROM carteras WHERE usuario_id = $1`, [id]);
