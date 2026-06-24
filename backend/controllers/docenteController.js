@@ -168,7 +168,6 @@ const eliminarAlumno = async (req, res) => {
     await client.query(`DELETE FROM desafios_progreso WHERE usuario_id = $1`, [id]);
     await client.query(`DELETE FROM operaciones WHERE usuario_id = $1`, [id]);
     await client.query(`DELETE FROM posiciones WHERE cartera_id IN (SELECT id FROM carteras WHERE usuario_id = $1)`, [id]);
-    await client.query(`DELETE FROM historial_capital WHERE cartera_id IN (SELECT id FROM carteras WHERE usuario_id = $1)`, [id]);
     await client.query(`DELETE FROM carteras WHERE usuario_id = $1`, [id]);
     await client.query(`DELETE FROM usuarios WHERE id = $1`, [id]);
 
