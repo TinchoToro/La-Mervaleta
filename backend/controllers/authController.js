@@ -30,7 +30,15 @@ const register = async (req, res) => {
     const usuario = rows[0];
 
     if (rol === 'alumno') {
-      await db.query('INSERT INTO carteras (usuario_id, capital_inicial, capital_actual) VALUES ($1, 1000000, 1000000)', [usuario.id]);
+      const tempActiva = await db.query(
+  `SELECT id FROM temporadas WHERE activa = TRUE AND escuela_id = $1 LIMIT 1`,
+  [escuela_id || null]
+);
+const temporada_id = tempActiva.rows[0]?.id || null;
+await db.query(
+  'INSERT INTO carteras (usuario_id, capital_inicial, capital_actual, temporada_id) VALUES ($1, 1000000, 1000000, $2)',
+  [usuario.id, temporada_id]
+);
     }
 
     const token = generarToken(usuario);
