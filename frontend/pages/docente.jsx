@@ -39,9 +39,10 @@ export default function Docente() {
 
   const [resumen, setResumen]       = useState(null);
   const [alumnos, setAlumnos]       = useState([]);
+  const [escuelas, setEscuelas]     = useState([]);
 
   const [temporadas, setTemporadas] = useState([]);
-  const [formTemp, setFormTemp]     = useState({ nombre: '', descripcion: '', fecha_inicio: '', fecha_fin: '', capital_inicial: '1000000' });
+  const [formTemp, setFormTemp]     = useState({ nombre: '', descripcion: '', fecha_inicio: '', fecha_fin: '', capital_inicial: '1000000', escuela_id: '' });
   const [editandoTemp, setEditandoTemp] = useState(null);
   const [modalTemp, setModalTemp]   = useState(false);
 
@@ -57,7 +58,7 @@ export default function Docente() {
   const [formGlosario, setFormGlosario] = useState({ termino: '', definicion: '', categoria: 'General', ejemplo: '' });
   const [modalConcepto, setModalConcepto] = useState(false);
   const [modalGlosario, setModalGlosario] = useState(false);
-  const [escuelas, setEscuelas] = useState([]);
+
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
     if (!cargando && usuario && !['docente','admin'].includes(usuario.rol)) { router.push('/dashboard'); return; }
@@ -69,21 +70,13 @@ export default function Docente() {
     setLoading(true);
     try {
       const [r, a, t, d, c, g, esc] = await Promise.all([
-  apiFetch('/docente/resumen').catch(() => null),
-  apiFetch('/docente/alumnos').catch(() => []),
-  apiFetch('/temporadas').catch(() => []),
-  apiFetch('/banco-desafios').catch(() => []),
-  apiFetch('/conceptos').catch(() => []),
-  apiFetch('/glosario').catch(() => []),
-  apiFetch('/escuelas').catch(() => []),
-]);
-setResumen(r);
-setAlumnos(Array.isArray(a) ? a : []);
-setTemporadas(Array.isArray(t) ? t : []);
-setDesafios(Array.isArray(d) ? d : []);
-setConceptos(Array.isArray(c) ? c : []);
-setGlosario(Array.isArray(g) ? g : []);
-setEscuelas(Array.isArray(esc) ? esc : []);
+        apiFetch('/docente/resumen').catch(() => null),
+        apiFetch('/docente/alumnos').catch(() => []),
+        apiFetch('/temporadas').catch(() => []),
+        apiFetch('/banco-desafios').catch(() => []),
+        apiFetch('/conceptos').catch(() => []),
+        apiFetch('/glosario').catch(() => []),
+        apiFetch('/escuelas').catch(() => []),
       ]);
       setResumen(r);
       setAlumnos(Array.isArray(a) ? a : []);
@@ -91,6 +84,7 @@ setEscuelas(Array.isArray(esc) ? esc : []);
       setDesafios(Array.isArray(d) ? d : []);
       setConceptos(Array.isArray(c) ? c : []);
       setGlosario(Array.isArray(g) ? g : []);
+      setEscuelas(Array.isArray(esc) ? esc : []);
     } catch {}
     setLoading(false);
   };
@@ -98,12 +92,16 @@ setEscuelas(Array.isArray(esc) ? esc : []);
   const showMsg = (tipo, texto) => { setMsg({ tipo, texto }); setTimeout(() => setMsg(null), 3000); };
 
   const guardarTemp = async () => {
-    if (!formTemp.nombre || !formTemp.fecha_inicio || !formTemp.fecha_fin) { showMsg('error', 'Completá nombre y fechas'); return; }
+    if (!formTemp.nombre || !formTemp.fecha_inicio || !formTemp.fecha_fin || !formTemp.escuela_id) {
+      showMsg('error', 'Completá nombre, fechas y escuela'); return;
+    }
     const ep = editandoTemp ? `/temporadas/${editandoTemp}` : '/temporadas';
     const data = await apiFetch(ep, { method: editandoTemp ? 'PUT' : 'POST', body: JSON.stringify(formTemp) });
     if (data.error) { showMsg('error', data.error); return; }
     showMsg('ok', editandoTemp ? 'Temporada actualizada' : 'Temporada creada');
-    setModalTemp(false); setFormTemp({ nombre: '', descripcion: '', fecha_inicio: '', fecha_fin: '', capital_inicial: '1000000' }); setEditandoTemp(null);
+    setModalTemp(false);
+    setFormTemp({ nombre: '', descripcion: '', fecha_inicio: '', fecha_fin: '', capital_inicial: '1000000', escuela_id: '' });
+    setEditandoTemp(null);
     const t = await apiFetch('/temporadas').catch(() => []);
     setTemporadas(Array.isArray(t) ? t : []);
   };
@@ -239,8 +237,7 @@ setEscuelas(Array.isArray(esc) ? esc : []);
               ) : [...alumnos].sort((a, b) => b.capital_actual - a.capital_actual).slice(0, 5).map((a, i) => {
                 const rend = a.capital_inicial ? ((a.capital_actual - a.capital_inicial) / a.capital_inicial * 100).toFixed(2) : 0;
                 return (
-                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }}
-                    onClick={() => setAlumnoDetalle(alumnoDetalle?.id === a.id ? null : a)}>
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <span style={{ fontSize: i < 3 ? 20 : 13, width: 28, textAlign: 'center' }}>{i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{a.nombre} {a.apellido}</div>
@@ -325,7 +322,7 @@ setEscuelas(Array.isArray(esc) ? esc : []);
         {/* ── TEMPORADAS ── */}
         {tab === 'temporadas' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <button onClick={() => { setModalTemp(true); setFormTemp({ nombre: '', descripcion: '', fecha_inicio: '', fecha_fin: '', capital_inicial: '1000000' }); setEditandoTemp(null); }}
+            <button onClick={() => { setModalTemp(true); setFormTemp({ nombre: '', descripcion: '', fecha_inicio: '', fecha_fin: '', capital_inicial: '1000000', escuela_id: '' }); setEditandoTemp(null); }}
               style={{ alignSelf: 'flex-start', background: 'linear-gradient(135deg,#059669,#0284c7)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               + Nueva temporada
             </button>
@@ -341,6 +338,7 @@ setEscuelas(Array.isArray(esc) ? esc : []);
               const estado = hoy < new Date(t.fecha_inicio) ? { label: 'Programada', color: '#60a5fa' } :
                              hoy > fin ? { label: 'Finalizada', color: '#475569' } :
                              { label: 'En curso', color: '#34d399' };
+              const escuelaNombre = escuelas.find(e => e.id === t.escuela_id)?.nombre || '';
               return (
                 <div key={t.id} style={{ background: t.activa ? 'rgba(52,211,153,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${t.activa ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 14, padding: '18px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -349,6 +347,7 @@ setEscuelas(Array.isArray(esc) ? esc : []);
                         <span style={{ fontWeight: 900, fontSize: 16 }}>{t.nombre}</span>
                         {t.activa && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)', fontWeight: 700 }}>● ACTIVA</span>}
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', color: estado.color, fontWeight: 700 }}>{estado.label}</span>
+                        {escuelaNombre && <span style={{ fontSize: 11, color: '#60a5fa' }}>🏫 {escuelaNombre}</span>}
                       </div>
                       <div style={{ fontSize: 12, color: '#475569', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                         <span>📅 {new Date(t.fecha_inicio).toLocaleDateString('es-AR')} → {new Date(t.fecha_fin).toLocaleDateString('es-AR')}</span>
@@ -357,7 +356,7 @@ setEscuelas(Array.isArray(esc) ? esc : []);
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => { setFormTemp({ nombre: t.nombre, descripcion: t.descripcion || '', fecha_inicio: t.fecha_inicio?.slice(0,10), fecha_fin: t.fecha_fin?.slice(0,10), capital_inicial: t.capital_inicial }); setEditandoTemp(t.id); setModalTemp(true); }}
+                      <button onClick={() => { setFormTemp({ nombre: t.nombre, descripcion: t.descripcion || '', fecha_inicio: t.fecha_inicio?.slice(0,10), fecha_fin: t.fecha_fin?.slice(0,10), capital_inicial: t.capital_inicial, escuela_id: t.escuela_id || '' }); setEditandoTemp(t.id); setModalTemp(true); }}
                         style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                         ✏️ Editar
                       </button>
@@ -481,6 +480,10 @@ setEscuelas(Array.isArray(esc) ? esc : []);
             <h3 style={{ color: '#f1f5f9', fontWeight: 800, margin: '0 0 20px', fontSize: 18 }}>{editandoTemp ? 'Editar temporada' : 'Nueva temporada'}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <input placeholder="Nombre *" value={formTemp.nombre} onChange={e => setFormTemp(p => ({ ...p, nombre: e.target.value }))} style={inputStyle} />
+              <select value={formTemp.escuela_id} onChange={e => setFormTemp(p => ({ ...p, escuela_id: e.target.value }))} style={inputStyle}>
+                <option value="">— Seleccioná una escuela *—</option>
+                {escuelas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+              </select>
               <input placeholder="Descripción" value={formTemp.descripcion} onChange={e => setFormTemp(p => ({ ...p, descripcion: e.target.value }))} style={inputStyle} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div><label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>Fecha inicio *</label><input type="date" value={formTemp.fecha_inicio} onChange={e => setFormTemp(p => ({ ...p, fecha_inicio: e.target.value }))} style={inputStyle} /></div>
