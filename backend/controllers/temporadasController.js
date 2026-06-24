@@ -4,7 +4,7 @@ const db = require('../config/db');
 // GET /api/temporadas – listar temporadas de la escuela del docente
 const listarTemporadas = async (req, res) => {
   try {
-    const escuela_id = req.usuario.escuela_id;
+    const escuela_id = req.body.escuela_id || req.usuario.escuela_id;
     let query = `
       SELECT t.*,
              (SELECT COUNT(*) FROM carteras c WHERE c.temporada_id = t.id) AS total_participantes,
