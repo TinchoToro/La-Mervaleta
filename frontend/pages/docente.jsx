@@ -147,7 +147,7 @@ export default function Docente() {
 
   const resetearCartera = async (id, nombre) => {
     if (!confirm(`¿Resetear la cartera de ${nombre}?`)) return;
-    const data = await apiFetch(`/admin/usuarios/${id}/resetear-cartera`, { method: 'POST' });
+    const data = await apiFetch(`/docente/alumnos/${id}/resetear-cartera`, { method: 'POST' });
     if (data.error) { showMsg('error', data.error); return; }
     showMsg('ok', `Cartera de ${nombre} reseteada`);
   };
