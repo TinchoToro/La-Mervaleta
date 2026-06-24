@@ -136,14 +136,15 @@ export default function Docente() {
     const g = await apiFetch('/glosario').catch(() => []);
     setGlosario(Array.isArray(g) ? g : []);
   };
-const eliminarAlumno = async (id, nombre) => {
-  if (!confirm(`¿Eliminar a ${nombre} definitivamente? Se borrarán todos sus datos.`)) return;
-  const data = await apiFetch(`/docente/alumnos/${id}`, { method: 'DELETE' });
-  if (data.error) { showMsg('error', data.error); return; }
-  showMsg('ok', `${nombre} eliminado`);
-  setAlumnos(prev => prev.filter(a => a.id !== id));
-};
-  
+
+  const eliminarAlumno = async (id, nombre) => {
+    if (!confirm(`¿Eliminar a ${nombre} definitivamente? Se borrarán todos sus datos.`)) return;
+    const data = await apiFetch(`/docente/alumnos/${id}`, { method: 'DELETE' });
+    if (data.error) { showMsg('error', data.error); return; }
+    showMsg('ok', `${nombre} eliminado`);
+    setAlumnos(prev => prev.filter(a => a.id !== id));
+  };
+
   const resetearCartera = async (id, nombre) => {
     if (!confirm(`¿Resetear la cartera de ${nombre}?`)) return;
     const data = await apiFetch(`/admin/usuarios/${id}/resetear-cartera`, { method: 'POST' });
@@ -245,7 +246,6 @@ const eliminarAlumno = async (id, nombre) => {
               })}
             </div>
 
-            {/* Alertas pedagógicas — FIX: al.msg en lugar de al */}
             {alumnos.filter(a => a.alertas?.length > 0).length > 0 && (
               <div style={{ background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 16, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(248,113,113,0.1)' }}>
@@ -291,12 +291,17 @@ const eliminarAlumno = async (id, nombre) => {
                       <div style={{ fontWeight: 800, color: rend >= 0 ? '#34d399' : '#f87171' }}>{rend >= 0 ? '+' : ''}{rend}%</div>
                       <div style={{ fontSize: 11, color: '#475569' }}>${Number(a.capital_actual || 1000000).toLocaleString('es-AR', { maximumFractionDigits: 0 })}</div>
                     </div>
-                    <button onClick={() => resetearCartera(a.id, `${a.nombre} ${a.apellido}`)}
-                      style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                      Resetear cartera
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => resetearCartera(a.id, `${a.nombre} ${a.apellido}`)}
+                        style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        Resetear cartera
+                      </button>
+                      <button onClick={() => eliminarAlumno(a.id, `${a.nombre} ${a.apellido}`)}
+                        style={{ background: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        🗑 Eliminar
+                      </button>
+                    </div>
                   </div>
-                  {/* FIX: al.msg en lugar de al */}
                   {a.alertas?.length > 0 && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                       {a.alertas.map((al, i) => <div key={i} style={{ fontSize: 11, color: '#f87171' }}>⚠️ {al.msg}</div>)}
