@@ -57,7 +57,7 @@ export default function Docente() {
   const [formGlosario, setFormGlosario] = useState({ termino: '', definicion: '', categoria: 'General', ejemplo: '' });
   const [modalConcepto, setModalConcepto] = useState(false);
   const [modalGlosario, setModalGlosario] = useState(false);
-
+  const [escuelas, setEscuelas] = useState([]);
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
     if (!cargando && usuario && !['docente','admin'].includes(usuario.rol)) { router.push('/dashboard'); return; }
@@ -68,13 +68,22 @@ export default function Docente() {
   const cargarTodo = async () => {
     setLoading(true);
     try {
-      const [r, a, t, d, c, g] = await Promise.all([
-        apiFetch('/docente/resumen').catch(() => null),
-        apiFetch('/docente/alumnos').catch(() => []),
-        apiFetch('/temporadas').catch(() => []),
-        apiFetch('/banco-desafios').catch(() => []),
-        apiFetch('/conceptos').catch(() => []),
-        apiFetch('/glosario').catch(() => []),
+      const [r, a, t, d, c, g, esc] = await Promise.all([
+  apiFetch('/docente/resumen').catch(() => null),
+  apiFetch('/docente/alumnos').catch(() => []),
+  apiFetch('/temporadas').catch(() => []),
+  apiFetch('/banco-desafios').catch(() => []),
+  apiFetch('/conceptos').catch(() => []),
+  apiFetch('/glosario').catch(() => []),
+  apiFetch('/escuelas').catch(() => []),
+]);
+setResumen(r);
+setAlumnos(Array.isArray(a) ? a : []);
+setTemporadas(Array.isArray(t) ? t : []);
+setDesafios(Array.isArray(d) ? d : []);
+setConceptos(Array.isArray(c) ? c : []);
+setGlosario(Array.isArray(g) ? g : []);
+setEscuelas(Array.isArray(esc) ? esc : []);
       ]);
       setResumen(r);
       setAlumnos(Array.isArray(a) ? a : []);
