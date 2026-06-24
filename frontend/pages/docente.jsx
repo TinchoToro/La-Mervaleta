@@ -136,7 +136,14 @@ export default function Docente() {
     const g = await apiFetch('/glosario').catch(() => []);
     setGlosario(Array.isArray(g) ? g : []);
   };
-
+const eliminarAlumno = async (id, nombre) => {
+  if (!confirm(`¿Eliminar a ${nombre} definitivamente? Se borrarán todos sus datos.`)) return;
+  const data = await apiFetch(`/docente/alumnos/${id}`, { method: 'DELETE' });
+  if (data.error) { showMsg('error', data.error); return; }
+  showMsg('ok', `${nombre} eliminado`);
+  setAlumnos(prev => prev.filter(a => a.id !== id));
+};
+  
   const resetearCartera = async (id, nombre) => {
     if (!confirm(`¿Resetear la cartera de ${nombre}?`)) return;
     const data = await apiFetch(`/admin/usuarios/${id}/resetear-cartera`, { method: 'POST' });
