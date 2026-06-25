@@ -39,8 +39,10 @@ export default function Mercado() {
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
     if (!usuario) return;
-    Promise.all([carteraService.listarActivos(), carteraService.miCartera()])
-      .then(([a, c]) => { setActivos(a); setCartera(c); }).finally(() => setLoading(false));
+    Promise.all([
+  carteraService.listarActivos(),
+  carteraService.miCartera().catch(() => null),
+]).then(([a, c]) => { setActivos(a); setCartera(c); }).finally(() => setLoading(false));
   }, [usuario, cargando]);
 
   const posicionDe = id => cartera?.posiciones?.find(p => p.activo_id === id);
