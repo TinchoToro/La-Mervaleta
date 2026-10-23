@@ -11,15 +11,15 @@ const generarCertificado = async (req, res) => {
     const { rows: alumnoRows } = await db.query(
       `SELECT u.nombre, u.apellido, u.anio_cursada,
               e.nombre AS escuela,
-              c.capital_inicial, c.capital_actual,
+              c.capital_inicial, c.patrimonio_total AS capital_actual, c.capital_actual AS capital_disponible,
               c.temporada_id,
-              ROUND(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100, 2) AS rendimiento_pct,
-              RANK() OVER (ORDER BY c.capital_actual DESC) AS posicion,
+              ROUND(((c.patrimonio_total - c.capital_inicial) / NULLIF(c.capital_inicial,0)) * 100, 2) AS rendimiento_pct,
+              (SELECT posicion FROM v_ranking_patrimonio_alumnos WHERE id=u.id) AS posicion,
               (SELECT COUNT(*) FROM usuarios WHERE rol = 'alumno' AND activo = TRUE) AS total_alumnos,
               (SELECT COUNT(*) FROM conceptos_vistos WHERE usuario_id = $1) AS conceptos_leidos,
               (SELECT COUNT(*) FROM operaciones WHERE usuario_id = $1) AS total_operaciones
        FROM usuarios u
-       JOIN carteras c ON c.usuario_id = u.id
+       JOIN v_carteras_valorizadas c ON c.usuario_id = u.id
        LEFT JOIN escuelas e ON e.id = u.escuela_id
        WHERE u.id = $1`,
       [usuario_id]

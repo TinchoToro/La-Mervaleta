@@ -1,5 +1,6 @@
 // controllers/trazabilidadController.js – Métricas educativas
 const db = require('../config/db');
+const { sincronizarEnTransaccion, sincronizar, resumir } = require('../services/desafios');
 
 const miProgreso = async (req, res) => {
   try {
@@ -11,7 +12,7 @@ const miProgreso = async (req, res) => {
               c.titulo, c.nivel
        FROM conceptos_vistos cv
        JOIN conceptos c ON c.id = cv.concepto_id
-       WHERE cv.usuario_id = $1
+       WHERE cv.usuario_id = $1 AND c.activo=TRUE
        ORDER BY cv.visto_at ASC`,
       [usuario_id]
     );
@@ -30,7 +31,7 @@ const miProgreso = async (req, res) => {
 
     const totales_por_nivel = {};
     porNivel.forEach(r => {
-      totales_por_nivel[r.nivel] = { total: parseInt(r.total), leidos: parseInt(r.leidos) };
+      totales_por_nivel[r.nivel.normalize('NFD').replace(/[\u0300-\u036f]/g, '')] = { total: parseInt(r.total), leidos: parseInt(r.leidos) };
     });
 
     // Operaciones con conceptos al momento
@@ -65,7 +66,10 @@ const miProgreso = async (req, res) => {
       else break;
     }
 
+    const desafios = await sincronizar(usuario_id, true);
     res.json({
+      desafios,
+      resumen_desafios: resumir(desafios),
       conceptos_vistos: conceptosVistos,
       totales_por_nivel,
       nivel_alcanzado,
@@ -82,11 +86,15 @@ const miProgreso = async (req, res) => {
 };
 
 const registrarLectura = async (req, res) => {
+  const client = await db.connect();
   try {
     const { concepto_id, tiempo_segundos } = req.body;
     if (!concepto_id) return res.status(400).json({ error: 'concepto_id requerido' });
+    if (tiempo_segundos != null && (!Number.isInteger(tiempo_segundos) || tiempo_segundos < 0 || tiempo_segundos > 86400)) return res.status(400).json({ error: 'Tiempo de lectura inválido' });
 
-    await db.query(
+    await client.query('BEGIN');
+    await client.query('SELECT id FROM usuarios WHERE id=$1 FOR UPDATE', [req.usuario.id]);
+    await client.query(
       `INSERT INTO conceptos_vistos (usuario_id, concepto_id, tiempo_lectura, veces_leido)
        VALUES ($1, $2, $3, 1)
        ON CONFLICT (usuario_id, concepto_id) DO UPDATE
@@ -95,18 +103,21 @@ const registrarLectura = async (req, res) => {
       [req.usuario.id, concepto_id, tiempo_segundos || 0]
     );
 
+    await sincronizarEnTransaccion(client, req.usuario.id, true);
+    await client.query('COMMIT');
     res.json({ mensaje: 'Lectura registrada' });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: 'Error al registrar lectura' });
-  }
+  } finally { client.release(); }
 };
 
 const trazabilidadAlumno = async (req, res) => {
   try {
     const { id } = req.params;
     const { rows: alumno } = await db.query(
-      'SELECT nombre, apellido, anio_cursada FROM usuarios WHERE id = $1', [id]
+      `SELECT nombre, apellido, anio_cursada FROM usuarios WHERE id = $1 AND ($2::boolean OR escuela_id=$3)`, [id, req.usuario.rol === 'admin', req.usuario.escuela_id || null]
     );
     if (alumno.length === 0) return res.status(404).json({ error: 'Alumno no encontrado' });
 

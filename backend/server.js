@@ -59,4 +59,9 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`🚀 Mervaleta API corriendo en puerto ${PORT}`));
+const db = require('./config/db');
+const { migrar } = require('./scripts/migrarDesafios');
+migrar(db).then(() => {
+  require('./services/mercado').iniciarActualizacion();
+  app.listen(PORT, () => console.log(`🚀 Mervaleta API corriendo en puerto ${PORT}`));
+}).catch(err => { console.error('No se pudo preparar la base de desafíos', err); process.exitCode = 1; db.end(); });

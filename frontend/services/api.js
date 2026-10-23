@@ -36,8 +36,8 @@ export const carteraService = {
 };
 
 export const operacionesService = {
-  comprar:   (activo_id, cantidad) => post('/comprar',  { activo_id, cantidad }),
-  vender:    (activo_id, cantidad) => post('/vender',   { activo_id, cantidad }),
+  comprar:   (activo_id, cantidad, precio_esperado) => post('/comprar', { activo_id, cantidad, precio_esperado }),
+  vender:    (activo_id, cantidad, precio_esperado) => post('/vender', { activo_id, cantidad, precio_esperado }),
   historial: ()                    => get('/operaciones'),
 };
 
