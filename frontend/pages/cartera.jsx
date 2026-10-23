@@ -4,11 +4,13 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
 import { carteraService, operacionesService } from '../services/api';
 import Link from 'next/link';
+import EstadoMercado from '../components/EstadoMercado';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export default function Cartera() {
   const router = useRouter();
+  const [errorDatos,setErrorDatos] = useState('');
   const { usuario, cargando } = useAuth();
   const [cartera, setCartera]         = useState(null);
   const [historial, setHistorial]     = useState([]);
@@ -28,8 +30,11 @@ export default function Cartera() {
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
     if (!usuario) return;
-    Promise.all([carteraService.miCartera(), operacionesService.historial()])
-      .then(([c, h]) => { setCartera(c); setHistorial(h); }).finally(() => setLoading(false));
+    const cargar = () => Promise.all([carteraService.miCartera(), operacionesService.historial()])
+      .then(([c, h]) => { setCartera(c); setHistorial(h); }).then(() => setErrorDatos('')).catch(() => setErrorDatos('No se pudieron actualizar los datos. Se muestra la última información cargada.')).finally(() => setLoading(false));
+    cargar();
+    const timer=setInterval(cargar,30000);
+    return () => clearInterval(timer);
   }, [usuario, cargando]);
 
   const descargarCertificado = async () => {
@@ -103,13 +108,16 @@ export default function Cartera() {
       </nav>
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {errorDatos && <p role="alert" style={{color:'#fbbf24'}}>{errorDatos}</p>}
+        <EstadoMercado />
 
         {/* Resumen */}
         {cartera && (
           <div style={{ background: sube ? 'linear-gradient(135deg,#064e3b,#0c4a6e)' : 'linear-gradient(135deg,#4c0519,#1e1b4b)', border: `1px solid ${sube ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'}`, borderRadius: 18, padding: '20px 16px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
               {[
-                { label: 'Capital actual', valor: `$${Number(cartera.capital_actual).toLocaleString('es-AR', { maximumFractionDigits: 0 })}` },
+                { label: 'Patrimonio total', valor: `$${Number(cartera.patrimonio_total).toLocaleString('es-AR', { maximumFractionDigits: 0 })}` },
+                { label: 'Disponible para operar', valor: `$${Number(cartera.capital_actual).toLocaleString('es-AR', { maximumFractionDigits: 0 })}` },
                 { label: 'Capital inicial', valor: `$${Number(cartera.capital_inicial).toLocaleString('es-AR', { maximumFractionDigits: 0 })}` },
                 { label: 'Rendimiento', valor: `${sube ? '+' : ''}${rendimiento}%`, color: sube ? '#34d399' : '#f87171' },
               ].map(s => (

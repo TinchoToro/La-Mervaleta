@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
 import Link from 'next/link';
+import SelectorRegla from '../components/SelectorRegla';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -43,7 +44,7 @@ export default function BancoDesafios() {
   const [modalNuevo, setModalNuevo] = useState(false);
   const [modalAsignar, setModalAsignar] = useState(null);
   const [msg, setMsg]             = useState(null);
-  const [form, setForm]           = useState({ titulo: '', descripcion: '', tipo: 'operacion', anio_cursada: '', materia: 'General', dificultad: 'medio', puntos_bonus: 300 });
+  const [form, setForm]           = useState({ titulo: '', descripcion: '', tipo: 'operacion', anio_cursada: '', materia: 'General', dificultad: 'medio', puntos_bonus: 300, regla_json: { tipo: 'conceptos_leidos', cantidad: 5 } });
   const [fechaAsignar, setFechaAsignar] = useState({ inicio: '', fin: '' });
 
   const esDocente = usuario?.rol === 'docente' || usuario?.rol === 'admin';
@@ -92,7 +93,7 @@ export default function BancoDesafios() {
     if (!fechaAsignar.inicio || !fechaAsignar.fin) { setMsg({ tipo: 'error', texto: 'Definí fecha de inicio y fin' }); return; }
     const data = await apiFetch(`/banco-desafios/${modalAsignar.id}/asignar`, {
       method: 'POST',
-      body: JSON.stringify({ fecha_inicio: fechaAsignar.inicio, fecha_fin: fechaAsignar.fin })
+      body: JSON.stringify({ fecha_inicio: fechaAsignar.inicio, fecha_fin: fechaAsignar.fin, regla_json: modalAsignar.regla_json })
     });
     if (data.error) { setMsg({ tipo: 'error', texto: data.error }); return; }
     setMsg({ tipo: 'ok', texto: `"${modalAsignar.titulo}" asignado a la liga activa` });
@@ -224,6 +225,7 @@ export default function BancoDesafios() {
                 <textarea placeholder="Que debe hacer el alumno para completarlo..." value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))}
                   style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} />
               </div>
+              <SelectorRegla value={form.regla_json} onChange={regla_json => setForm(p => ({ ...p, regla_json }))} style={inputStyle} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>Año cursada</label>
@@ -269,9 +271,12 @@ export default function BancoDesafios() {
       {/* Modal asignar */}
       {modalAsignar && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
-          <div style={{ background: '#131c2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, width: '100%', maxWidth: 400, padding: 28 }}>
+          <div style={{ background: '#131c2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, width: '100%', maxWidth: 400, padding: 28, maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ color: '#f1f5f9', fontWeight: 800, margin: '0 0 8px', fontSize: 16 }}>Asignar a la liga activa</h3>
             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>{modalAsignar.titulo}</p>
+            <SelectorRegla value={modalAsignar.regla_json || { tipo: 'manual' }}
+              onChange={regla_json => setModalAsignar(p => ({ ...p, regla_json }))} style={inputStyle} />
+            <p style={{ fontSize: 12, color: '#94a3b8' }}>Verificá que la condición elegida coincida con la consigna.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
               <div>
                 <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>Fecha inicio</label>

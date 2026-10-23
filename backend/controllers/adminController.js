@@ -10,7 +10,7 @@ const getStats = async (req, res) => {
         (SELECT COUNT(*) FROM usuarios WHERE rol = 'docente' AND activo = TRUE) AS total_docentes,
         (SELECT COUNT(*) FROM escuelas WHERE activa = TRUE) AS total_escuelas,
         (SELECT COUNT(*) FROM operaciones) AS total_operaciones,
-        (SELECT ROUND(AVG(((capital_actual - capital_inicial) / capital_inicial) * 100), 2) FROM carteras) AS rendimiento_promedio
+        (SELECT ROUND(AVG(rendimiento_pct), 2) FROM v_carteras_valorizadas) AS rendimiento_promedio
     `);
     res.json(rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Error al obtener stats' }); }
@@ -21,10 +21,10 @@ const getUsuarios = async (req, res) => {
     const { rows } = await db.query(`
       SELECT u.id, u.nombre, u.apellido, u.email, u.rol, u.activo, u.anio_cursada,
              u.escuela_id, e.nombre AS escuela_nombre, u.ultima_actividad, u.created_at,
-             c.capital_actual, c.capital_inicial
+             c.patrimonio_total AS capital_actual, c.capital_inicial
       FROM usuarios u
       LEFT JOIN escuelas e ON e.id = u.escuela_id
-      LEFT JOIN carteras c ON c.usuario_id = u.id
+      LEFT JOIN v_carteras_valorizadas c ON c.usuario_id = u.id
       ORDER BY u.created_at DESC
     `);
     res.json(rows);
@@ -55,8 +55,11 @@ const resetearCartera = async (req, res) => {
   try {
     const { id } = req.params;
     await client.query('BEGIN');
-    const { rows } = await client.query('SELECT id FROM carteras WHERE usuario_id = $1', [id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Cartera no encontrada' });
+    const usuario = await client.query(`SELECT id FROM usuarios WHERE id=$1 AND rol='alumno'
+      AND ($2::boolean OR escuela_id=$3) FOR UPDATE`,[id,req.usuario.rol === 'admin',req.usuario.escuela_id || null]);
+    if (!usuario.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error:'Alumno no encontrado en tu escuela' }); }
+    const { rows } = await client.query('SELECT id FROM carteras WHERE usuario_id = $1 FOR UPDATE', [id]);
+    if (rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Cartera no encontrada' }); }
     const cartera_id = rows[0].id;
     await client.query('DELETE FROM posiciones WHERE cartera_id = $1', [cartera_id]);
     await client.query('DELETE FROM operaciones WHERE usuario_id = $1', [id]);

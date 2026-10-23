@@ -2,64 +2,51 @@
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
 const db     = require('../config/db');
+const { sincronizar } = require('../services/desafios');
 
 // POST /api/auth/register
 const register = async (req, res) => {
   const { nombre, apellido, email, password, escuela_id, anio_cursada } = req.body;
-  const rol = 'alumno';
-  if (!nombre || !apellido || !email || !password || !rol) {
-    return res.status(400).json({ error: 'Todos los campos son obligatorios' });
-  }
-  if (!['alumno','docente','escuela','admin'].includes(rol)) {
-    return res.status(400).json({ error: 'Rol inválido' });
-  }
-
+  if (![nombre,apellido,email,password].every(v => typeof v === 'string' && v.trim())) return res.status(400).json({ error:'Todos los campos son obligatorios' });
+  if (password.length < 8 || password.length > 72 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return res.status(400).json({ error:'Ingresá un email válido y una contraseña de 8 a 72 caracteres' });
+  let client;
   try {
-    const existe = await db.query('SELECT id FROM usuarios WHERE email = $1', [email]);
-    if (existe.rows.length > 0) {
-      return res.status(409).json({ error: 'El email ya está registrado' });
-    }
-
     const hash = await bcrypt.hash(password, 10);
-    const { rows } = await db.query(
-      `INSERT INTO usuarios (nombre, apellido, email, password_hash, rol, escuela_id, anio_cursada)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, nombre, apellido, email, rol, escuela_id, perfil_completado, perfil_riesgo`,
-      [nombre, apellido, email, hash, rol, escuela_id || null, anio_cursada || null]
-    );
-    const usuario = rows[0];
-
-    if (rol === 'alumno') {
-      const tempActiva = await db.query(
-  `SELECT id FROM temporadas WHERE activa = TRUE AND escuela_id = $1 LIMIT 1`,
-  [escuela_id || null]
-);
-const temporada_id = tempActiva.rows[0]?.id || null;
-await db.query(
-  'INSERT INTO carteras (usuario_id, capital_inicial, capital_actual, temporada_id) VALUES ($1, 1000000, 1000000, $2)',
-  [usuario.id, temporada_id]
-);
+    client = await db.connect();
+    await client.query('BEGIN');
+    if (escuela_id) {
+      const escuela = await client.query('SELECT id FROM escuelas WHERE id=$1 AND activa=TRUE',[escuela_id]);
+      if (!escuela.rows.length) { await client.query('ROLLBACK'); return res.status(400).json({ error:'Escuela no disponible' }); }
     }
-
-    const token = generarToken(usuario);
-    res.status(201).json({ usuario, token });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al registrar usuario' });
-  }
+    const { rows } = await client.query(`INSERT INTO usuarios(nombre,apellido,email,password_hash,rol,escuela_id,anio_cursada)
+      VALUES($1,$2,$3,$4,'alumno',$5,$6) RETURNING id,nombre,apellido,email,rol,escuela_id,perfil_completado,perfil_riesgo`,
+    [nombre.trim(),apellido.trim(),email.trim().toLowerCase(),hash,escuela_id || null,anio_cursada || null]);
+    const usuario=rows[0];
+    const temporadas=await client.query('SELECT id,capital_inicial FROM temporadas WHERE activa=TRUE AND escuela_id=$1 ORDER BY fecha_inicio DESC LIMIT 1',[escuela_id || null]);
+    const temporada=temporadas.rows[0];
+    await client.query('INSERT INTO carteras(usuario_id,capital_inicial,capital_actual,temporada_id) VALUES($1,$2,$2,$3)',[usuario.id,temporada?.capital_inicial || 1000000,temporada?.id || null]);
+    const token=generarToken(usuario);
+    await client.query('COMMIT');
+    res.status(201).json({usuario,token});
+  } catch(err) {
+    if(client) await client.query('ROLLBACK');
+    if(err.code==='23505') return res.status(409).json({error:'El email ya está registrado'});
+    console.error('Error al registrar usuario:',err.code || err.name);
+    res.status(500).json({error:'Error al registrar usuario'});
+  } finally { if(client) client.release(); }
 };
 
 // POST /api/auth/login
 const login = async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
+  if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
     return res.status(400).json({ error: 'Email y contraseña requeridos' });
   }
 
   try {
     const { rows } = await db.query(
       'SELECT * FROM usuarios WHERE email = $1 AND activo = TRUE',
-      [email]
+      [email.trim().toLowerCase()]
     );
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
@@ -73,6 +60,7 @@ const login = async (req, res) => {
 
     delete usuario.password_hash;
     await db.query('UPDATE usuarios SET ultima_actividad = NOW() WHERE id = $1', [usuario.id]);
+    if (usuario.rol === 'alumno') await sincronizar(usuario.id, true);
     const token = generarToken(usuario);
     res.json({ usuario, token });
   } catch (err) {
@@ -85,7 +73,7 @@ const login = async (req, res) => {
 const me = async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, nombre, apellido, email, rol, escuela_id, perfil_completado, perfil_riesgo, created_at
+      `SELECT id, nombre, apellido, email, rol, escuela_id, perfil_completado, perfil_riesgo, anio_cursada, created_at
        FROM usuarios WHERE id = $1`,
       [req.usuario.id]
     );

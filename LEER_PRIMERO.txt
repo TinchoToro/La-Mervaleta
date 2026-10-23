@@ -1,0 +1,5 @@
+La Mervaleta: archivos corregidos para aplicar sobre el repositorio existente.
+Extraer y reemplazar conservando las carpetas backend y frontend.
+Leer CORRECCIONES.md antes de desplegar. No ejecutar el esquema inicial sobre Railway existente.
+Commit de origen: b224912. Correcciones locales: baf8894.
+No se han publicado estos cambios. La conexión a un proveedor real de cotizaciones requiere configuración/adaptador.

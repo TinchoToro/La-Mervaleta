@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
 import Link from 'next/link';
+import SelectorRegla from '../components/SelectorRegla';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -117,7 +118,7 @@ export default function Docente() {
   const asignarDesafio = async () => {
     if (!fechaAsignar.inicio || !fechaAsignar.fin) { showMsg('error', 'Definí fechas'); return; }
     const data = await apiFetch(`/banco-desafios/${modalAsignar.id}/asignar`, {
-      method: 'POST', body: JSON.stringify({ fecha_inicio: fechaAsignar.inicio, fecha_fin: fechaAsignar.fin })
+      method: 'POST', body: JSON.stringify({ fecha_inicio: fechaAsignar.inicio, fecha_fin: fechaAsignar.fin, regla_json: modalAsignar.regla_json })
     });
     if (data.error) { showMsg('error', data.error); return; }
     showMsg('ok', `"${modalAsignar.titulo}" asignado`);
@@ -377,6 +378,7 @@ export default function Docente() {
         {/* ── DESAFÍOS ── */}
         {tab === 'desafios' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Link href="/revision-desafios" style={{ color: '#34d399', fontWeight: 700 }}>Revisar actividades y acreditar puntos →</Link>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {['todos','4to','5to','6to','7mo','general'].map(a => (
                 <button key={a} onClick={() => setFiltroAnio(a)}
@@ -502,9 +504,12 @@ export default function Docente() {
       {/* Modal asignar desafío */}
       {modalAsignar && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
-          <div style={{ background: '#131c2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, width: '100%', maxWidth: 400, padding: 28 }}>
+          <div style={{ background: '#131c2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, width: '100%', maxWidth: 400, padding: 28, maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ color: '#f1f5f9', fontWeight: 800, margin: '0 0 8px', fontSize: 16 }}>Asignar desafío</h3>
             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>{modalAsignar.titulo}</p>
+            <SelectorRegla value={modalAsignar.regla_json || { tipo: 'manual' }}
+              onChange={regla_json => setModalAsignar(p => ({ ...p, regla_json }))} style={inputStyle} />
+            <p style={{ fontSize: 12, color: '#94a3b8' }}>Verificá que la condición elegida coincida con la consigna.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
               <div><label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>Inicio</label><input type="date" value={fechaAsignar.inicio} onChange={e => setFechaAsignar(p => ({ ...p, inicio: e.target.value }))} style={inputStyle} /></div>
               <div><label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>Fin</label><input type="date" value={fechaAsignar.fin} onChange={e => setFechaAsignar(p => ({ ...p, fin: e.target.value }))} style={inputStyle} /></div>

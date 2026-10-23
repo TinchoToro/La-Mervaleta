@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
 import { conceptosService } from '../services/api';
 import Link from 'next/link';
+import ResumenDesafios from '../components/ResumenDesafios';
 
 const NIVEL = {
   basico:      { color: '#34d399', bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.25)',  label: 'Básico'      },
@@ -28,8 +29,9 @@ export default function Conceptos() {
   const marcarVisto = async (id) => {
     try {
       await conceptosService.marcarVisto(id);
+      window.dispatchEvent(new Event('mervaleta:actividad'));
       setConceptos(prev => prev.map(c => c.id === id ? { ...c, visto: true } : c));
-    } catch {}
+    } catch (err) { window.alert(err.message || 'No se pudo guardar la lectura. Intentá abrir el concepto nuevamente.'); }
   };
 
   const filtrados = conceptos.filter(c =>
@@ -58,6 +60,8 @@ export default function Conceptos() {
       </nav>
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        <ResumenDesafios />
 
         {/* Hero progreso */}
         <div style={{ background: 'linear-gradient(135deg,#0d1b3e,#0a1628)', border: '1px solid rgba(2,132,199,0.3)', borderRadius: 18, padding: '24px', position: 'relative', overflow: 'hidden' }}>

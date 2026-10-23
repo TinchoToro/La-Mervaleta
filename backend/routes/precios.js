@@ -1,8 +1,8 @@
-// routes/precios.js
 const router = require('express').Router();
-const { actualizarPrecios } = require('../controllers/preciosController');
-
-// Endpoint público con clave secreta — para cron jobs
-router.get('/actualizar', actualizarPrecios);
-
+const { actualizarPrecios, estadoPrecios } = require('../controllers/preciosController');
+const { verificarToken } = require('../middleware/auth');
+router.get('/estado',verificarToken,estadoPrecios);
+// Compatibilidad con cron por GET; ambos exigen Bearer y nunca usan claves en la URL.
+router.get('/actualizar',actualizarPrecios);
+router.post('/actualizar',actualizarPrecios);
 module.exports = router;

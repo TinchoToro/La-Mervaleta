@@ -1,3 +1,5 @@
+> Actualización del 23/10/2026: ver [CORRECCIONES.md](CORRECCIONES.md) para la revisión, despliegue, migraciones y conexión de cotizaciones. Las instrucciones históricas de abajo describen la versión inicial.
+
 # La Mervaleta – Liga Escolar de Inversión 🏦
 
 Plataforma educativa de inversión simulada para estudiantes de secundaria.

@@ -1,12 +1,15 @@
 {
   "name": "mervaleta-backend",
   "version": "1.0.0",
-  "description": "API REST – Liga Escolar de Inversión La Mervaleta",
+  "description": "API REST \u2013 Liga Escolar de Inversi\u00f3n La Mervaleta",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "db:init": "psql $DATABASE_URL -f config/schema.sql"
+    "db:init": "psql $DATABASE_URL -f config/schema.sql",
+    "db:migrate": "node scripts/migrarDesafios.js",
+    "db:repair-challenges": "node scripts/repararDesafios.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -21,6 +24,10 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
     "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=22 <25"
   }
 }

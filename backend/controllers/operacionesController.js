@@ -1,12 +1,14 @@
 // controllers/operacionesController.js – Comprar y vender activos
 const db = require('../config/db');
+const { sincronizarEnTransaccion } = require('../services/desafios');
+const { cotizacionOperable } = require('../services/cotizacionOperable');
 
 // POST /api/comprar
 const comprar = async (req, res) => {
   const { activo_id, cantidad } = req.body;
   const usuario_id = req.usuario.id;
 
-  if (!activo_id || !cantidad || cantidad <= 0) {
+  if (!activo_id || !Number.isSafeInteger(cantidad) || cantidad <= 0 || cantidad > 2147483647) {
     return res.status(400).json({ error: 'Activo y cantidad válida son requeridos' });
   }
 
@@ -14,10 +16,11 @@ const comprar = async (req, res) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT id FROM usuarios WHERE id=$1 FOR UPDATE', [usuario_id]);
 
     // 1. Obtener precio actual del activo
     const { rows: activoRows } = await client.query(
-      'SELECT id, ticker, precio FROM activos WHERE id = $1 AND activo = TRUE',
+      'SELECT id, ticker, precio, cotizacion_at, cotizacion_fuente FROM activos WHERE id = $1 AND activo = TRUE FOR SHARE',
       [activo_id]
     );
     if (activoRows.length === 0) {
@@ -25,6 +28,14 @@ const comprar = async (req, res) => {
       return res.status(404).json({ error: 'Activo no encontrado' });
     }
     const activo = activoRows[0];
+    if (!cotizacionOperable(activo)) {
+      await client.query('ROLLBACK');
+      return res.status(503).json({ error: 'Este instrumento no tiene una cotización vigente del proveedor. Intentá más tarde.' });
+    }
+    if (req.body.precio_esperado != null && Number(req.body.precio_esperado) !== Number(activo.precio)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'La cotización cambió. Actualizá el mercado y confirmá el nuevo precio.' });
+    }
     const total  = activo.precio * cantidad;
 
     // 2. Verificar que leyó al menos 1 concepto
@@ -87,6 +98,7 @@ const comprar = async (req, res) => {
       [usuario_id, activo_id, cantidad, activo.precio]
     );
 
+    await sincronizarEnTransaccion(client, usuario_id, true);
     await client.query('COMMIT');
     res.status(201).json({
       mensaje: `Compraste ${cantidad} acciones de ${activo.ticker}`,
@@ -108,17 +120,18 @@ const vender = async (req, res) => {
   const { activo_id, cantidad } = req.body;
   const usuario_id = req.usuario.id;
 
-  if (!activo_id || !cantidad || cantidad <= 0) {
+  if (!activo_id || !Number.isSafeInteger(cantidad) || cantidad <= 0 || cantidad > 2147483647) {
     return res.status(400).json({ error: 'Activo y cantidad válida son requeridos' });
   }
 
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT id FROM usuarios WHERE id=$1 FOR UPDATE', [usuario_id]);
 
     // 1. Obtener precio actual
     const { rows: activoRows } = await client.query(
-      'SELECT id, ticker, precio FROM activos WHERE id = $1 AND activo = TRUE',
+      'SELECT id, ticker, precio, cotizacion_at, cotizacion_fuente FROM activos WHERE id = $1 AND activo = TRUE FOR SHARE',
       [activo_id]
     );
     if (activoRows.length === 0) {
@@ -126,6 +139,14 @@ const vender = async (req, res) => {
       return res.status(404).json({ error: 'Activo no encontrado' });
     }
     const activo = activoRows[0];
+    if (!cotizacionOperable(activo)) {
+      await client.query('ROLLBACK');
+      return res.status(503).json({ error: 'Este instrumento no tiene una cotización vigente del proveedor. Intentá más tarde.' });
+    }
+    if (req.body.precio_esperado != null && Number(req.body.precio_esperado) !== Number(activo.precio)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'La cotización cambió. Actualizá el mercado y confirmá el nuevo precio.' });
+    }
     const total  = activo.precio * cantidad;
 
     // 2. Verificar posición existente
@@ -170,6 +191,7 @@ const vender = async (req, res) => {
       [usuario_id, activo_id, cantidad, activo.precio]
     );
 
+    await sincronizarEnTransaccion(client, usuario_id, true);
     await client.query('COMMIT');
     res.status(201).json({
       mensaje: `Vendiste ${cantidad} acciones de ${activo.ticker}`,

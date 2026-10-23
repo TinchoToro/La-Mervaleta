@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
 import Link from 'next/link';
+import ResumenDesafios from '../components/ResumenDesafios';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -45,6 +46,8 @@ export default function Progreso() {
       </nav>
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        <ResumenDesafios />
 
         {/* Nivel alcanzado */}
         <div style={{ background: `linear-gradient(135deg,${nivelCfg.bg},rgba(0,0,0,0.2))`, border: `1px solid ${nivelCfg.color}40`, borderRadius: 18, padding: '24px', textAlign: 'center' }}>
@@ -97,7 +100,7 @@ export default function Progreso() {
         </div>
 
         {/* Correlación lectura vs operaciones */}
-        {datos?.correlacion_operaciones?.length || 0 > 0 && (
+        {(datos?.correlacion_operaciones?.length || 0) > 0 && (
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>🔗 Correlación educativa</div>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
