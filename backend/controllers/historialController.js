@@ -5,26 +5,27 @@ const db = require('../config/db');
 const historialActivo = async (req, res) => {
   try {
     const { ticker } = req.params;
-    const { dias = 30 } = req.query;
+    const dias = Number(req.query.dias || 30);
+    if (!Number.isInteger(dias) || dias < 1 || dias > 365) return res.status(400).json({ error: 'dias debe ser un entero entre 1 y 365' });
 
     const { rows } = await db.query(
-      `SELECT hp.precio, hp.variacion_dia, hp.fecha
+      `SELECT recientes.precio, recientes.variacion_dia, recientes.fecha FROM (SELECT hp.precio, hp.variacion_dia, hp.fecha
        FROM historial_precios hp
        JOIN activos a ON a.id = hp.activo_id
-       WHERE a.ticker = $1
-       ORDER BY hp.fecha ASC
-       LIMIT $2`,
-      [ticker.toUpperCase(), parseInt(dias)]
+       WHERE a.ticker = $1 AND hp.fuente IS NOT NULL
+       ORDER BY hp.fecha DESC
+       LIMIT $2) recientes ORDER BY recientes.fecha ASC`,
+      [ticker.toUpperCase(), dias]
     );
 
     if (rows.length === 0) {
       // Si no hay historial, devolver precio actual como punto único
       const { rows: actual } = await db.query(
-        'SELECT precio, variacion_dia FROM activos WHERE ticker = $1',
+        'SELECT precio, variacion_dia, cotizacion_at FROM activos WHERE ticker = $1',
         [ticker.toUpperCase()]
       );
       if (actual.length === 0) return res.status(404).json({ error: 'Activo no encontrado' });
-      return res.json([{ precio: actual[0].precio, variacion_dia: actual[0].variacion_dia, fecha: new Date().toISOString().split('T')[0] }]);
+      return res.json([{ precio: actual[0].precio, variacion_dia: actual[0].variacion_dia, fecha: actual[0].cotizacion_at, sin_historial: true }]);
     }
 
     res.json(rows);
@@ -43,7 +44,7 @@ const historialPanel = async (req, res) => {
        FROM historial_precios hp
        JOIN activos a ON a.id = hp.activo_id
        WHERE a.ticker = ANY($1)
-       AND hp.fecha >= CURRENT_DATE - INTERVAL '30 days'
+       AND hp.fecha >= CURRENT_DATE - INTERVAL '90 days' AND hp.fuente IS NOT NULL
        ORDER BY a.ticker, hp.fecha ASC`,
       [PANEL]
     );

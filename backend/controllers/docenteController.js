@@ -10,8 +10,8 @@ const listarAlumnos = async (req, res) => {
     const { rows } = await db.query(
       `SELECT
          u.id, u.nombre, u.apellido, u.email, u.anio_cursada, u.ultima_actividad,
-         c.capital_inicial, c.capital_actual,
-         ROUND(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100, 2) AS rendimiento_pct,
+         c.capital_inicial, c.patrimonio_total AS capital_actual, c.capital_actual AS capital_disponible,
+         ROUND(((c.patrimonio_total - c.capital_inicial) / NULLIF(c.capital_inicial,0)) * 100, 2) AS rendimiento_pct,
          CASE WHEN u.ultima_actividad IS NULL THEN 999
               ELSE EXTRACT(DAY FROM NOW() - u.ultima_actividad)::INTEGER END AS dias_sin_actividad,
          (SELECT COUNT(*) FROM operaciones o WHERE o.usuario_id = u.id) AS total_operaciones,
@@ -19,14 +19,14 @@ const listarAlumnos = async (req, res) => {
          (SELECT COUNT(*) FROM conceptos WHERE activo = TRUE) AS conceptos_total,
          (SELECT COUNT(*) FROM posiciones p JOIN carteras c2 ON c2.id = p.cartera_id WHERE c2.usuario_id = u.id) AS posiciones_abiertas,
          COALESCE((
-           SELECT ROUND(MAX(p.cantidad * a.precio) / NULLIF(c.capital_actual, 0) * 100, 1)
+           SELECT ROUND(MAX(p.cantidad * a.precio) / NULLIF(c.patrimonio_total, 0) * 100, 1)
            FROM posiciones p JOIN carteras c2 ON c2.id = p.cartera_id JOIN activos a ON a.id = p.activo_id
            WHERE c2.usuario_id = u.id
          ), 0) AS concentracion_max_pct
        FROM usuarios u
-       JOIN carteras c ON c.usuario_id = u.id
+       JOIN v_carteras_valorizadas c ON c.usuario_id = u.id
        WHERE u.escuela_id = $1 AND u.rol = 'alumno' AND u.activo = TRUE
-       ORDER BY c.capital_actual DESC`,
+       ORDER BY c.patrimonio_total DESC`,
       [escuela_id]
     );
 
@@ -61,9 +61,9 @@ const detalleAlumno = async (req, res) => {
 
     const { rows: alumnoRows } = await db.query(
       `SELECT u.id, u.nombre, u.apellido, u.email, u.anio_cursada, u.ultima_actividad,
-              c.capital_inicial, c.capital_actual,
-              ROUND(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100, 2) AS rendimiento_pct
-       FROM usuarios u JOIN carteras c ON c.usuario_id = u.id
+              c.capital_inicial, c.patrimonio_total AS capital_actual, c.capital_actual AS capital_disponible,
+              ROUND(((c.patrimonio_total - c.capital_inicial) / NULLIF(c.capital_inicial,0)) * 100, 2) AS rendimiento_pct
+       FROM usuarios u JOIN v_carteras_valorizadas c ON c.usuario_id = u.id
        WHERE u.id = $1 AND u.escuela_id = $2 AND u.rol = 'alumno'`,
       [id, escuela_id]
     );
@@ -76,7 +76,7 @@ const detalleAlumno = async (req, res) => {
               a.ticker, a.nombre AS activo_nombre, a.sector, a.tipo, a.precio AS precio_actual,
               ROUND(((a.precio - p.precio_promedio) / p.precio_promedio) * 100, 2) AS ganancia_pct,
               (p.cantidad * a.precio) AS valor_actual
-       FROM posiciones p JOIN carteras c ON c.id = p.cartera_id JOIN activos a ON a.id = p.activo_id
+       FROM posiciones p JOIN v_carteras_valorizadas c ON c.id = p.cartera_id JOIN activos a ON a.id = p.activo_id
        WHERE c.usuario_id = $1 ORDER BY valor_actual DESC`,
       [id]
     );
@@ -114,20 +114,20 @@ const resumenEscuela = async (req, res) => {
       `SELECT
          COUNT(u.id) AS total_alumnos,
          COUNT(CASE WHEN u.ultima_actividad > NOW() - INTERVAL '7 days' THEN 1 END) AS activos_semana,
-         ROUND(AVG(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100), 2) AS rendimiento_promedio,
-         COUNT(CASE WHEN ((c.capital_actual - c.capital_inicial) / c.capital_inicial) > 0 THEN 1 END) AS alumnos_positivos,
-         COUNT(CASE WHEN ((c.capital_actual - c.capital_inicial) / c.capital_inicial) < -0.15 THEN 1 END) AS alumnos_perdida_alta,
+         ROUND(AVG(((c.patrimonio_total - c.capital_inicial) / NULLIF(c.capital_inicial,0)) * 100), 2) AS rendimiento_promedio,
+         COUNT(CASE WHEN ((c.patrimonio_total - c.capital_inicial) / NULLIF(c.capital_inicial,0)) > 0 THEN 1 END) AS alumnos_positivos,
+         COUNT(CASE WHEN ((c.patrimonio_total - c.capital_inicial) / NULLIF(c.capital_inicial,0)) < -0.15 THEN 1 END) AS alumnos_perdida_alta,
          (SELECT COUNT(*) FROM operaciones o JOIN usuarios u2 ON u2.id = o.usuario_id
           WHERE u2.escuela_id = $1 AND o.fecha > NOW() - INTERVAL '7 days') AS operaciones_semana
-       FROM usuarios u JOIN carteras c ON c.usuario_id = u.id
+       FROM usuarios u JOIN v_carteras_valorizadas c ON c.usuario_id = u.id
        WHERE u.escuela_id = $1 AND u.rol = 'alumno' AND u.activo = TRUE`,
       [escuela_id]
     );
 
     const { rows: porAnio } = await db.query(
       `SELECT u.anio_cursada, COUNT(*) AS cantidad,
-              ROUND(AVG(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100), 2) AS rendimiento_promedio
-       FROM usuarios u JOIN carteras c ON c.usuario_id = u.id
+              ROUND(AVG(((c.patrimonio_total - c.capital_inicial) / NULLIF(c.capital_inicial,0)) * 100), 2) AS rendimiento_promedio
+       FROM usuarios u JOIN v_carteras_valorizadas c ON c.usuario_id = u.id
        WHERE u.escuela_id = $1 AND u.rol = 'alumno' AND u.activo = TRUE
        GROUP BY u.anio_cursada ORDER BY u.anio_cursada`,
       [escuela_id]

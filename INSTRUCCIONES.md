@@ -1,3 +1,5 @@
+> Para esta actualización, seguir primero [CORRECCIONES.md](CORRECCIONES.md). No volver a ejecutar el esquema inicial sobre una base existente.
+
 # La Mervaleta – Liga Escolar de Inversión 🏦
 
 Plataforma educativa de inversión simulada para estudiantes de secundaria.
@@ -7,7 +9,7 @@ Plataforma educativa de inversión simulada para estudiantes de secundaria.
 ## Instalación paso a paso
 
 ### Requisitos previos
-- **Node.js 18+** → https://nodejs.org
+- **Node.js 22** → https://nodejs.org
 - **PostgreSQL 14+** → https://www.postgresql.org/download/
 
 ---

@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { authService, escuelasService } from '../services/api';
 import Link from 'next/link';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.137:4000/api';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 const get  = (ep) => fetch(`${API}${ep}`, { headers: { Authorization: `Bearer ${localStorage.getItem('mervaleta_token')}` } }).then(r => r.json());
 const post = (ep, body) => fetch(`${API}${ep}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('mervaleta_token')}` }, body: JSON.stringify(body) }).then(r => r.json());

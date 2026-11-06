@@ -1,6 +1,7 @@
 // controllers/informeController.js – Informe PDF por alumno
 const PDFDocument = require('pdfkit');
 const db = require('../config/db');
+const { sincronizar } = require('../services/desafios');
 
 const generarInforme = async (req, res) => {
   try {
@@ -15,16 +16,17 @@ const generarInforme = async (req, res) => {
     const { rows: alumnoRows } = await db.query(
       `SELECT u.nombre, u.apellido, u.email, u.anio_cursada, u.perfil_riesgo,
               e.nombre AS escuela, e.ciudad,
-              c.capital_inicial, c.capital_actual,
-              ROUND(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100, 2) AS rendimiento_pct
+              c.capital_inicial, c.patrimonio_total AS capital_actual, c.capital_actual AS capital_disponible,
+              ROUND(((c.patrimonio_total - c.capital_inicial) / NULLIF(c.capital_inicial,0)) * 100, 2) AS rendimiento_pct
        FROM usuarios u
-       JOIN carteras c ON c.usuario_id = u.id
+       JOIN v_carteras_valorizadas c ON c.usuario_id = u.id
        LEFT JOIN escuelas e ON e.id = u.escuela_id
-       WHERE u.id = $1`,
-      [usuario_id]
+       WHERE u.id = $1 AND ($2::boolean OR u.id=$3 OR u.escuela_id=$4)`,
+      [usuario_id, req.usuario.rol === 'admin', req.usuario.id, req.usuario.rol === 'docente' ? req.usuario.escuela_id || null : null]
     );
     if (alumnoRows.length === 0) return res.status(404).json({ error: 'Alumno no encontrado' });
     const a = alumnoRows[0];
+    await sincronizar(usuario_id);
 
     // Posiciones
     const { rows: posiciones } = await db.query(
@@ -33,7 +35,7 @@ const generarInforme = async (req, res) => {
               (p.cantidad * a.precio) AS valor_actual,
               ROUND(((a.precio - p.precio_promedio) / p.precio_promedio) * 100, 2) AS ganancia_pct
        FROM posiciones p
-       JOIN carteras c ON c.id = p.cartera_id
+       JOIN v_carteras_valorizadas c ON c.id = p.cartera_id
        JOIN activos a ON a.id = p.activo_id
        WHERE c.usuario_id = $1 AND p.cantidad > 0
        ORDER BY valor_actual DESC`,

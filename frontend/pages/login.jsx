@@ -182,7 +182,7 @@ if (usuario.rol === 'docente' || usuario.rol === 'admin') {
             )}
 
             <input type="email" placeholder="Email *" value={form.email} onChange={e => f('email', e.target.value)} style={inputStyle} />
-            <input type="password" placeholder="Contraseña *" value={form.password} onChange={e => f('password', e.target.value)} style={inputStyle} />
+            <input type="password" placeholder={modo === 'registro' ? 'Contraseña (8 a 72 caracteres) *' : 'Contraseña *'} value={form.password} onChange={e => f('password', e.target.value)} style={inputStyle} />
 
             {error && (
               <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 12px', fontSize: 13, color: '#dc2626' }}>

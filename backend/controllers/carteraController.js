@@ -7,10 +7,10 @@ const miCartera = async (req, res) => {
     // Cartera + posiciones + rendimiento
     const { rows: cartera } = await db.query(
       `SELECT
-         c.id, c.capital_inicial, c.capital_actual,
-         ROUND(((c.capital_actual - c.capital_inicial) / c.capital_inicial) * 100, 2) AS rendimiento_pct,
+         c.id, c.capital_inicial, c.capital_actual, c.valor_invertido, c.patrimonio_total,
+         c.rendimiento_pct,
          c.updated_at
-       FROM carteras c
+       FROM v_carteras_valorizadas c
        WHERE c.usuario_id = $1`,
       [req.usuario.id]
     );
@@ -26,7 +26,7 @@ const miCartera = async (req, res) => {
          a.nombre,
          a.sector,
          a.precio as precio_actual,
-         a.variacion_dia,
+         a.variacion_dia, a.cotizacion_at, a.cotizacion_fuente,
          (p.cantidad * a.precio) AS valor_actual,
          ROUND(((a.precio - p.precio_promedio) / p.precio_promedio) * 100, 2) AS ganancia_pct
        FROM posiciones p
@@ -48,9 +48,11 @@ const listarActivos = async (req, res) => {
   try {
     const { rows } = await db.query(
 
-'SELECT id, ticker, nombre, sector, tipo, descripcion, precio, variacion_dia FROM activos WHERE activo = TRUE ORDER BY ticker'
+'SELECT id, ticker, nombre, sector, tipo, descripcion, precio, variacion_dia, cotizacion_at, cotizacion_fuente FROM activos WHERE activo = TRUE ORDER BY ticker'
     );
-    res.json(rows);
+    res.set('Cache-Control', 'no-store');
+    const maxEdad = Number(process.env.MARKET_MAX_AGE_SECONDS || 86400) * 1000;
+    res.json(rows.map(a => ({ ...a, cotizacion_vencida: !a.cotizacion_at || Date.now() - new Date(a.cotizacion_at).getTime() > maxEdad })));
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener activos' });
   }

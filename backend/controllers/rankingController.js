@@ -5,7 +5,7 @@ const db = require('../config/db');
 const rankingAlumnos = async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT * FROM v_ranking_alumnos ORDER BY posicion LIMIT 100`
+      `SELECT * FROM v_ranking_patrimonio_alumnos ORDER BY posicion LIMIT 100`
     );
     res.json(rows);
   } catch (err) {
@@ -17,7 +17,7 @@ const rankingAlumnos = async (req, res) => {
 const rankingEscuelas = async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT * FROM v_ranking_escuelas ORDER BY posicion`
+      `SELECT * FROM v_ranking_patrimonio_escuelas ORDER BY posicion`
     );
     res.json(rows);
   } catch (err) {
@@ -29,7 +29,7 @@ const rankingEscuelas = async (req, res) => {
 const miPosicion = async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT * FROM v_ranking_alumnos WHERE id = $1`,
+      `SELECT * FROM v_ranking_patrimonio_alumnos WHERE id = $1`,
       [req.usuario.id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'No encontrado en el ranking' });

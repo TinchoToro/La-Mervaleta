@@ -7,6 +7,7 @@ import Link from 'next/link';
 
 export default function Ranking() {
   const router = useRouter();
+  const [errorDatos,setErrorDatos] = useState('');
   const { usuario, cargando } = useAuth();
   const [alumnos, setAlumnos]   = useState([]);
   const [escuelas, setEscuelas] = useState([]);
@@ -17,8 +18,11 @@ export default function Ranking() {
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
     if (!usuario) return;
-    Promise.all([rankingService.alumnos(), rankingService.escuelas(), rankingService.miPosicion().catch(() => null)])
-      .then(([a, e, p]) => { setAlumnos(a); setEscuelas(e); setMiPos(p); }).finally(() => setLoading(false));
+    const cargar = () => Promise.all([rankingService.alumnos(), rankingService.escuelas(), rankingService.miPosicion().catch(() => null)])
+      .then(([a, e, p]) => { setAlumnos(a); setEscuelas(e); setMiPos(p); }).then(() => setErrorDatos('')).catch(() => setErrorDatos('No se pudieron actualizar los datos. Se muestra la última información cargada.')).finally(() => setLoading(false));
+    cargar();
+    const timer=setInterval(cargar,30000);
+    return () => clearInterval(timer);
   }, [usuario, cargando]);
 
   if (cargando || loading) return <Spinner />;
@@ -34,6 +38,7 @@ export default function Ranking() {
       </nav>
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {errorDatos && <p role="alert" style={{color:'#fbbf24'}}>{errorDatos}</p>}
 
         {/* Mi posición */}
         {miPos && (

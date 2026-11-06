@@ -1,5 +1,6 @@
 // controllers/conceptosController.js – Módulo educativo
 const db = require('../config/db');
+const { sincronizarEnTransaccion } = require('../services/desafios');
 
 // GET /api/conceptos – Todos los conceptos con estado "visto"
 const listar = async (req, res) => {
@@ -22,17 +23,23 @@ const listar = async (req, res) => {
 
 // POST /api/conceptos/:id/ver – Marcar concepto como visto
 const marcarVisto = async (req, res) => {
+  const client = await db.connect();
   try {
-    await db.query(
+    await client.query('BEGIN');
+    await client.query('SELECT id FROM usuarios WHERE id=$1 FOR UPDATE', [req.usuario.id]);
+    await client.query(
       `INSERT INTO conceptos_vistos (usuario_id, concepto_id)
        VALUES ($1, $2)
        ON CONFLICT DO NOTHING`,
       [req.usuario.id, req.params.id]
     );
+    await sincronizarEnTransaccion(client, req.usuario.id, true);
+    await client.query('COMMIT');
     res.json({ mensaje: '¡Concepto completado! Ya podés operar este activo.' });
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).json({ error: 'Error al registrar concepto' });
-  }
+  } finally { client.release(); }
 };
 
 // GET /api/conceptos/pendientes – Conceptos sin leer

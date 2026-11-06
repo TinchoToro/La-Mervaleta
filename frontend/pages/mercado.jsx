@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
 import { carteraService, operacionesService } from '../services/api';
 import Link from 'next/link';
+import EstadoMercado from '../components/EstadoMercado';
 
 const TIPO_CONFIG = {
   accion: { label: 'Accion',  color: '#60a5fa', bg: 'rgba(96,165,250,0.1)'  },
@@ -25,6 +26,7 @@ const FILTROS = [
 
 export default function Mercado() {
   const router = useRouter();
+  const [errorDatos,setErrorDatos] = useState('');
   const { usuario, cargando } = useAuth();
   const [activos, setActivos]   = useState([]);
   const [cartera, setCartera]   = useState(null);
@@ -39,10 +41,13 @@ export default function Mercado() {
   useEffect(() => {
     if (!cargando && !usuario) { router.push('/login'); return; }
     if (!usuario) return;
-    Promise.all([
+    const cargar = () => Promise.all([
   carteraService.listarActivos(),
   carteraService.miCartera().catch(() => null),
-]).then(([a, c]) => { setActivos(a); setCartera(c); }).finally(() => setLoading(false));
+]).then(([a, c]) => { setActivos(Array.isArray(a) ? a : []); setCartera(c); }).then(() => setErrorDatos('')).catch(() => setErrorDatos('No se pudieron actualizar los datos. Se muestra la última información cargada.')).finally(() => setLoading(false));
+    cargar();
+    const timer=setInterval(cargar,30000);
+    return () => clearInterval(timer);
   }, [usuario, cargando]);
 
   const posicionDe = id => cartera?.posiciones?.find(p => p.activo_id === id);
@@ -66,12 +71,12 @@ export default function Mercado() {
   const abrirModal = (activo, tipo) => { setModal({ activo, tipo }); setCantidad(1); setMsg(null); };
 
   const confirmar = async () => {
-    if (!modal || cantidad <= 0) return;
+    if (!modal || !Number.isInteger(Number(cantidad)) || Number(cantidad) <= 0) { setMsg({tipo:'error',texto:'Ingresá una cantidad entera mayor a cero'}); return; }
     setOperando(true); setMsg(null);
     try {
       let res;
-      if (modal.tipo === 'compra') res = await operacionesService.comprar(modal.activo.id, Number(cantidad));
-      else res = await operacionesService.vender(modal.activo.id, Number(cantidad));
+      if (modal.tipo === 'compra') res = await operacionesService.comprar(modal.activo.id, Number(cantidad), Number(modal.activo.precio));
+      else res = await operacionesService.vender(modal.activo.id, Number(cantidad), Number(modal.activo.precio));
       setMsg({ tipo: 'ok', texto: res.mensaje });
       const c = await carteraService.miCartera();
       setCartera(c);
@@ -104,6 +109,8 @@ export default function Mercado() {
       </nav>
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {errorDatos && <p role="alert" style={{color:'#fbbf24'}}>{errorDatos}</p>}
+        <EstadoMercado />
 
         {/* Buscador */}
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
@@ -157,11 +164,14 @@ export default function Mercado() {
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 700,
                         background: sube ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
                         color: sube ? '#34d399' : '#f87171' }}>
-                        {sube ? '▲' : '▼'} {sube ? '+' : ''}{activo.variacion_dia}%
+                        {activo.variacion_dia == null ? 'Sin variación informada' : `${sube ? '+' : ''}${activo.variacion_dia}%`}
                       </span>
                       {pos && <span style={{ fontSize: 11, color: '#60a5fa', background: 'rgba(96,165,250,0.1)', padding: '2px 8px', borderRadius: 20 }}>Tenes {pos.cantidad}</span>}
                     </div>
                     <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{activo.nombre}</div>
+                    <div style={{fontSize:11,color:activo.cotizacion_vencida?'#fbbf24':'#94a3b8',marginTop:5}}>
+                      {activo.cotizacion_at ? `${activo.cotizacion_fuente} · ${new Date(activo.cotizacion_at).toLocaleString('es-AR')}${activo.cotizacion_vencida ? ' · Cotización antigua' : ''}` : 'Precio inicial sin fuente de mercado verificada'}
+                    </div>
                     {activo.sector && <div style={{ fontSize: 11, color: '#334155', marginTop: 2, textTransform: 'capitalize' }}>{activo.sector}</div>}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>

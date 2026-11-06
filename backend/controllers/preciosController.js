@@ -1,53 +1,29 @@
-// controllers/preciosController.js – Actualización automática de precios
+const { timingSafeEqual } = require('node:crypto');
 const db = require('../config/db');
-
-const actualizarPrecios = async (req, res) => {
-  // Verificar clave secreta para evitar abuso
-  const { secret } = req.query;
-  if (secret !== process.env.CRON_SECRET && secret !== 'mervaleta2026') {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
-
+const { actualizarMercado } = require('../services/mercado');
+function autorizarCron(req) {
+  const clave = process.env.CRON_SECRET;
+  const recibido = req.headers.authorization;
+  if (!clave || typeof recibido !== 'string') return false;
+  const esperado = Buffer.from(`Bearer ${clave}`);
+  const valor = Buffer.from(recibido);
+  return valor.length === esperado.length && timingSafeEqual(valor,esperado);
+}
+const actualizarPrecios = async (req,res) => {
+  if (!autorizarCron(req)) return res.status(401).json({ error:'No autorizado' });
   try {
-    // Obtener precios actuales
-    const { rows: activos } = await db.query(
-      'SELECT id, ticker, precio FROM activos WHERE activo = TRUE'
-    );
-
-    let actualizados = 0;
-    for (const activo of activos) {
-      // Variación simulada entre -3% y +3%
-      const variacion = parseFloat((Math.random() * 6 - 3).toFixed(2));
-      const nuevoPrecio = parseFloat((activo.precio * (1 + variacion / 100)).toFixed(2));
-
-      // Actualizar precio actual
-      await db.query(
-        'UPDATE activos SET precio = $1, variacion_dia = $2, updated_at = NOW() WHERE id = $3',
-        [nuevoPrecio, variacion, activo.id]
-      );
-
-      // Guardar en historial
-      await db.query(
-        `INSERT INTO historial_precios (activo_id, precio, variacion_dia, fecha)
-         VALUES ($1, $2, $3, CURRENT_DATE)
-         ON CONFLICT (activo_id, fecha) DO UPDATE
-         SET precio = EXCLUDED.precio, variacion_dia = EXCLUDED.variacion_dia`,
-        [activo.id, nuevoPrecio, variacion]
-      );
-
-      actualizados++;
-    }
-
-    res.json({
-      mensaje: `${actualizados} activos actualizados`,
-      fecha: new Date().toISOString(),
-      actualizados
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al actualizar precios' });
-  }
+    const resultado = await actualizarMercado();
+    res.status(resultado.estado === 'sin_configurar' ? 503 : 200).json(resultado);
+  } catch { res.status(502).json({ error:'No se pudo actualizar el mercado; se conservaron los últimos precios' }); }
 };
-
-module.exports = { actualizarPrecios };
+const estadoPrecios = async (req,res) => {
+  try {
+    const { rows } = await db.query(`SELECT e.*,
+      (SELECT COUNT(*) FROM activos WHERE activo=TRUE) AS total_activos,
+      (SELECT COUNT(*) FROM activos WHERE activo=TRUE AND cotizacion_at IS NOT NULL) AS activos_con_fuente
+      FROM estado_mercado e WHERE e.id=1`);
+    res.set('Cache-Control','no-store');
+    res.json({ ...rows[0], proveedor_configurado: Boolean(process.env.MARKET_DATA_URL && process.env.MARKET_DATA_SOURCE) });
+  } catch { res.status(500).json({ error:'No se pudo consultar el estado del mercado' }); }
+};
+module.exports = { actualizarPrecios, estadoPrecios, autorizarCron };
